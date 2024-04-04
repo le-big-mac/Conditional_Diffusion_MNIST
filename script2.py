@@ -44,7 +44,7 @@ for ep in range(n_epoch):
         optim.zero_grad()
         x = x.to(device)
         c = c.to(device)
-        loss = ddpm(x, c)
+        loss = ddpm(x, c, num_param_samples=1)
         loss.backward()
         if loss_ema is None:
             loss_ema = loss.item()
@@ -59,7 +59,7 @@ for ep in range(n_epoch):
     with torch.no_grad():
         n_sample = 4*n_classes
         for w_i, w in enumerate(ws_test):
-            x_gen, x_gen_store = ddpm.sample(n_sample, (1, 28, 28), device, guide_w=w)
+            x_gen, x_gen_store = ddpm.sample(n_sample, 10, (1, 28, 28), device, guide_w=w, num_param_samples=1)
 
             # append some real images at bottom, order by class also
             x_real = torch.Tensor(x_gen.shape).to(device)
