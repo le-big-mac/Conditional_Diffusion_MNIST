@@ -282,9 +282,9 @@ class DDPM(nn.Module):
             z = torch.randn(num_noise_samples, *size).to(device) if i > 1 else 0
 
             # split predictions and compute weighting
-            x_i = x_i.repeat(num_param_samples, 1, 1, 1, 1)
+            x_sample = x_i.repeat(num_param_samples, 1, 1, 1, 1)
             param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
-            eps = param_sample_fn(x_i, c_i, t_is, context_mask).mean(dim=0)
+            eps = param_sample_fn(x_sample, c_i, t_is, context_mask).mean(dim=0)
 
             # eps = self.nn_model(x_i, c_i, t_is, context_mask)
             eps1 = eps[:num_noise_samples]
