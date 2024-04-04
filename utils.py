@@ -1,16 +1,90 @@
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation, PillowWriter
 import torch
+from torchvision.utils import save_image, make_grid
+from tqdm import tqdm
 
 
-def kl_divergence(mu1, logvar1, mu2, logvar2):
-    log_std_diff = logvar2 - logvar1
-    mu_diff_term =(torch.exp(logvar1) + (mu1 - mu2)**2) / torch.exp(logvar2)
-    return 0.5 * torch.sum(log_std_diff + mu_diff_term - 1)
+def stack_params(model):
+    mu = []
+    logvar = []
+
+    for name, param in model.named_parameters():
+        if name[-4:] == 'mean':
+            mu.append(param.view(-1))
+        elif name[-6:] == 'logvar':
+            logvar.append(param.view(-1))
+
+    return torch.cat(mu), torch.cat(logvar)
 
 
-def total_kl_divergence(new_model, old_model):
-    kl = 0
-    for new_layer, old_layer in zip(new_model.layers, old_model.layers):
-        kl += kl_divergence(new_layer.weight_mean, new_layer.weight_logvar, old_layer.weight_mean, old_layer.weight_logvar)
-        kl += kl_divergence(new_layer.bias_mean, new_layer.bias_logvar, old_layer.bias_mean, old_layer.bias_logvar)
+def kld(model, prior_mu, prior_logvar):
+    mu, logvar = stack_params(model)
 
-    return kl
+    log_std_diff = prior_logvar - logvar
+    mu_diff = (torch.exp(logvar) + (mu - prior_mu)**2) / torch.exp(prior_logvar)
+
+    return 0.5 * torch.sum(log_std_diff + mu_diff - 1)
+
+
+def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=None, prior_logvar=None, mle=True):
+    ddpm.train()
+
+    pbar = tqdm(dataloader)
+    loss_ema = None
+    for x, c in pbar:
+        optim.zero_grad()
+        x = x.to(device)
+        c = c.to(device)
+        loss = ddpm(x, c, num_param_samples)
+        if not mle:
+            loss += kld(ddpm.nn_model, prior_mu, prior_logvar) / len(dataloader.dataset)
+        loss.backward()
+        if loss_ema is None:
+            loss_ema = loss.item()
+        else:
+            loss_ema = 0.95 * loss_ema + 0.05 * loss.item()
+        pbar.set_description(f"loss: {loss_ema:.4f}")
+        optim.step()
+
+    return x, c
+
+
+def eval(ep, ddpm, x, c, n_classes, save_dir, device, ws_test=[0.0, 0.5, 2.0], save_gif=False):
+    ddpm.eval()
+    with torch.no_grad():
+        n_noise_samples = 4 * n_classes
+        for w_i, w in enumerate(ws_test):
+            x_gen, x_gen_store = ddpm.sample(n_noise_samples, (1, 28, 28), device, guide_w=w)
+
+            # append some real images at bottom, order by class also
+            x_real = torch.Tensor(x_gen.shape).to(device)
+            for k in range(n_classes):
+                for j in range(int(n_noise_samples/n_classes)):
+                    try:
+                        idx = torch.squeeze((c == k).nonzero())[j]
+                    except:
+                        idx = 0
+                    x_real[k+(j*n_classes)] = x[idx]
+
+            x_all = torch.cat([x_gen, x_real])
+            grid = make_grid(x_all*-1 + 1, nrow=10)
+            save_image(grid, save_dir + f"image_ep{ep}_w{w}.png")
+            print('saved image at ' + save_dir + f"image_ep{ep}_w{w}.png")
+
+            if save_gif:
+                fig, axs = plt.subplots(nrows=int(n_noise_samples/n_classes), ncols=n_classes,sharex=True,sharey=True,figsize=(8,3))
+                def animate_diff(i, x_gen_store):
+                    print(f'gif animating frame {i} of {x_gen_store.shape[0]}', end='\r')
+                    plots = []
+                    for row in range(int(n_noise_samples/n_classes)):
+                        for col in range(n_classes):
+                            axs[row, col].clear()
+                            axs[row, col].set_xticks([])
+                            axs[row, col].set_yticks([])
+                            # plots.append(axs[row, col].imshow(x_gen_store[i,(row*n_classes)+col,0],cmap='gray'))
+                            plots.append(axs[row, col].imshow(-x_gen_store[i,(row*n_classes)+col,0],cmap='gray',vmin=(-x_gen_store[i]).min(), vmax=(-x_gen_store[i]).max()))
+                    return plots
+                ani = FuncAnimation(fig, animate_diff, fargs=[x_gen_store],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0])
+                ani.save(save_dir + f"gif_ep{ep}_w{w}.gif", dpi=100, writer=PillowWriter(fps=5))
+                print('saved image at ' + save_dir + f"gif_ep{ep}_w{w}.gif")

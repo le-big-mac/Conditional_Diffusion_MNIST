@@ -242,12 +242,13 @@ class DDPM(nn.Module):
         context_mask = torch.bernoulli(torch.zeros_like(c)+self.drop_prob).to(self.device)
 
         # return MSE between added noise, and our predicted noise
-        x_t = x_t.repeat(num_param_samples, 1, 1, 1)
+        x_t = x_t.repeat(num_param_samples, 1, 1, 1, 1)
+        noise = noise.repeat(num_param_samples, 1, 1, 1)
         param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
-        out = param_sample_fn(x_t, c, _ts / self.n_T, context_mask).mean(dim=0)
+        out = param_sample_fn(x_t, c, _ts / self.n_T, context_mask).reshape(x_t.shape[0] * x_t.shape[1], *x_t.shape[2:])
         return self.loss_mse(noise, out)
 
-    def sample(self, num_noise_samples, num_param_samples, num_classes, size, device, guide_w = 0.0):
+    def sample(self, num_noise_samples, num_classes, size, device, guide_w = 0.0, num_param_samples=10):
         # we follow the guidance sampling scheme described in 'Classifier-Free Diffusion Guidance'
         # to make the fwd passes efficient, we concat two versions of the dataset,
         # one with context_mask=0 and the other context_mask=1
