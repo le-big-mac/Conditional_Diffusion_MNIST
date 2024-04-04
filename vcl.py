@@ -48,7 +48,7 @@ for ep in range(n_epoch):
     train_epoch(ddpm_mle, zero_loader, optim, device)
 
 ddpm_mle.cpu()
-nn_model = ContextUnet(1, n_feat, n_classes, mle=False)
+nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp)
 ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
 ddpm.load_state_dict(ddpm_mle.state_dict())
 ddpm.to(device)
