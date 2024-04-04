@@ -6,8 +6,9 @@ import torch.nn.functional as F
 
 
 class Linear(nn.Module):
-    def __init__(self, in_features, out_features, bias=True):
+    def __init__(self, in_features, out_features, bias=True, mle=False):
         super().__init__()
+        self.mle = mle
         self.in_features = in_features
         self.out_features = out_features
         self.weight_mean = nn.Parameter(torch.Tensor(out_features, in_features))
@@ -28,6 +29,9 @@ class Linear(nn.Module):
             nn.init.constant_(self.bias_logvar, -6.)
 
     def forward(self, x):
+        if self.mle:
+            return F.linear(x, self.weight_mean, self.bias_mean)
+
         weight_std = torch.exp(0.5 * self.weight_logvar)
         weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
         bias = None
@@ -38,8 +42,9 @@ class Linear(nn.Module):
 
 
 class Conv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, mle=False):
         super().__init__()
+        self.mle = mle
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -63,6 +68,9 @@ class Conv2d(nn.Module):
             nn.init.constant_(self.bias_logvar, -6.)
 
     def forward(self, x):
+        if self.mle:
+            return F.conv2d(x, self.weight_mean, self.bias_mean, stride=self.stride, padding=self.padding)
+
         weight_std = torch.exp(0.5 * self.weight_logvar)
         weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
         bias = None
@@ -73,8 +81,9 @@ class Conv2d(nn.Module):
 
 
 class ConvTranspose2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, mle=False):
         super().__init__()
+        self.mle = mle
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -98,6 +107,9 @@ class ConvTranspose2d(nn.Module):
             nn.init.constant_(self.bias_logvar, -6.)
 
     def forward(self, x):
+        if self.mle:
+            return F.conv_transpose2d(x, self.weight_mean, self.bias_mean, stride=self.stride, padding=self.padding)
+
         weight_std = torch.exp(0.5 * self.weight_logvar)
         weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
         bias = None
