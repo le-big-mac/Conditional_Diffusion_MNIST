@@ -67,6 +67,6 @@ for digit in range(n_classes):
         x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp)
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         save_gif = False
-        eval(ep, ddpm, digit+1, f"{save_dir}/{digit}", device, save_gif=save_gif)
+        eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif)
 
     prior_mu, prior_logvar = stack_params(nn_model)
