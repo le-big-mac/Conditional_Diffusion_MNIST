@@ -60,7 +60,7 @@ for digit in range(n_classes):
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu, prior_logvar, mle=mle_comp)
+        x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp)
         save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         eval(ep, ddpm, digit, f"{save_dir}/{digit}", device, save_gif=save_gif)
 
