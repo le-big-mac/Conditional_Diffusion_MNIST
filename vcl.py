@@ -6,7 +6,16 @@ from torch.utils import data
 from mnist import get_split_MNIST
 from model import ContextUnet, DDPM
 from utils import eval, stack_params, train_epoch
+import argparse
 
+parser = argparse.ArgumentParser(description='Conditional Diffusion MNIST')
+parser.add_argument('--save_dir', type=str, help='directory to save the results')
+parser.add_argument('--mle_comp', action='store_true', help='whether to use compute MLE comparison')
+
+args = parser.parse_args()
+
+save_dir = args.save_dir
+mle_comp = args.mle_comp
 n_epoch = 20
 batch_size = 256
 n_T = 400 # 500
@@ -15,11 +24,13 @@ n_classes = 10
 n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = False
-save_dir = './data/mle_online/'
-mle_comp = True
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
+
+for i in range(n_classes):
+    if not os.path.exists(f"{save_dir}/{i}"):
+        os.makedirs(f"{save_dir}/{i}")
 
 digit_datasets = get_split_MNIST()
 
@@ -50,6 +61,6 @@ for digit in range(n_classes):
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu, prior_logvar, mle=mle_comp)
         save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
-        eval(ep, ddpm, x, c, n_classes, save_dir, device, save_gif=save_gif)
+        eval(ep, ddpm, digit, f"{save_dir}/{digit}", device, save_gif=save_gif)
 
     prior_mu, prior_logvar = stack_params(nn_model)

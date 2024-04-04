@@ -50,25 +50,13 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
     return x, c
 
 
-def eval(ep, ddpm, x, c, n_classes, save_dir, device, ws_test=[0.0, 0.5, 2.0], save_gif=False):
+def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.0, 0.5, 2.0], save_gif=False):
     ddpm.eval()
     with torch.no_grad():
         n_noise_samples = 4 * n_classes
         for w_i, w in enumerate(ws_test):
-            x_gen, x_gen_store = ddpm.sample(n_noise_samples, (1, 28, 28), device, guide_w=w)
-
-            # append some real images at bottom, order by class also
-            x_real = torch.Tensor(x_gen.shape).to(device)
-            for k in range(n_classes):
-                for j in range(int(n_noise_samples/n_classes)):
-                    try:
-                        idx = torch.squeeze((c == k).nonzero())[j]
-                    except:
-                        idx = 0
-                    x_real[k+(j*n_classes)] = x[idx]
-
-            x_all = torch.cat([x_gen, x_real])
-            grid = make_grid(x_all*-1 + 1, nrow=10)
+            x_gen, x_gen_store = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w)
+            grid = make_grid(x_gen*-1 + 1, nrow=10)
             save_image(grid, save_dir + f"image_ep{ep}_w{w}.png")
             print('saved image at ' + save_dir + f"image_ep{ep}_w{w}.png")
 
