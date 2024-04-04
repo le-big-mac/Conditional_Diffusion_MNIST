@@ -1,3 +1,5 @@
+import os
+
 import torch
 from torch.utils import data
 
@@ -13,8 +15,11 @@ n_classes = 10
 n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = False
-save_dir = './data/diffusion_outputs10/'
-mle_comp = False
+save_dir = './data/mle_online/'
+mle_comp = True
+
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
 
 digit_datasets = get_split_MNIST()
 
