@@ -1,4 +1,4 @@
-''' 
+'''
 This script does conditional image generation on MNIST, using a diffusion model
 
 This code is modified from,
@@ -57,7 +57,7 @@ class ResidualConvBlock(nn.Module):
             if self.same_channels:
                 out = x + x2
             else:
-                out = x1 + x2 
+                out = x1 + x2
             return out / 1.414
         else:
             x1 = self.conv1(x)
@@ -101,7 +101,7 @@ class EmbedFC(nn.Module):
     def __init__(self, input_dim, emb_dim):
         super(EmbedFC, self).__init__()
         '''
-        generic one layer FC NN for embedding things  
+        generic one layer FC NN for embedding things
         '''
         self.input_dim = input_dim
         layers = [
@@ -153,7 +153,7 @@ class ContextUnet(nn.Module):
         )
 
     def forward(self, x, c, t, context_mask):
-        # x is (noisy) image, c is context label, t is timestep, 
+        # x is (noisy) image, c is context label, t is timestep,
         # context_mask says which samples to block the context on
 
         x = self.init_conv(x)
@@ -163,13 +163,13 @@ class ContextUnet(nn.Module):
 
         # convert context to one hot embedding
         c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
-        
+
         # mask out context if context_mask == 1
         context_mask = context_mask[:, None]
         context_mask = context_mask.repeat(1,self.n_classes)
         context_mask = (-1*(1-context_mask)) # need to flip 0 <-> 1
         c = c * context_mask
-        
+
         # embed context, time step
         cemb1 = self.contextembed1(c).view(-1, self.n_feat * 2, 1, 1)
         temb1 = self.timeembed1(t).view(-1, self.n_feat * 2, 1, 1)
@@ -247,7 +247,7 @@ class DDPM(nn.Module):
 
         # dropout context with some probability
         context_mask = torch.bernoulli(torch.zeros_like(c)+self.drop_prob).to(self.device)
-        
+
         # return MSE between added noise, and our predicted noise
         return self.loss_mse(noise, self.nn_model(x_t, c, _ts / self.n_T, context_mask))
 
@@ -270,7 +270,7 @@ class DDPM(nn.Module):
         context_mask = context_mask.repeat(2)
         context_mask[n_sample:] = 1. # makes second half of batch context free
 
-        x_i_store = [] # keep track of generated steps in case want to plot something 
+        x_i_store = [] # keep track of generated steps in case want to plot something
         print()
         for i in range(self.n_T, 0, -1):
             print(f'sampling timestep {i}',end='\r')
@@ -295,7 +295,7 @@ class DDPM(nn.Module):
             )
             if i%20==0 or i==self.n_T or i<8:
                 x_i_store.append(x_i.detach().cpu().numpy())
-        
+
         x_i_store = np.array(x_i_store)
         return x_i, x_i_store
 
@@ -347,7 +347,7 @@ def train_mnist():
                 loss_ema = 0.95 * loss_ema + 0.05 * loss.item()
             pbar.set_description(f"loss: {loss_ema:.4f}")
             optim.step()
-        
+
         # for eval, save an image of currently generated samples (top rows)
         # followed by real images (bottom rows)
         ddpm.eval()
@@ -360,7 +360,7 @@ def train_mnist():
                 x_real = torch.Tensor(x_gen.shape).to(device)
                 for k in range(n_classes):
                     for j in range(int(n_sample/n_classes)):
-                        try: 
+                        try:
                             idx = torch.squeeze((c == k).nonzero())[j]
                         except:
                             idx = 0
@@ -385,7 +385,7 @@ def train_mnist():
                                 # plots.append(axs[row, col].imshow(x_gen_store[i,(row*n_classes)+col,0],cmap='gray'))
                                 plots.append(axs[row, col].imshow(-x_gen_store[i,(row*n_classes)+col,0],cmap='gray',vmin=(-x_gen_store[i]).min(), vmax=(-x_gen_store[i]).max()))
                         return plots
-                    ani = FuncAnimation(fig, animate_diff, fargs=[x_gen_store],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0])    
+                    ani = FuncAnimation(fig, animate_diff, fargs=[x_gen_store],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0])
                     ani.save(save_dir + f"gif_ep{ep}_w{w}.gif", dpi=100, writer=PillowWriter(fps=5))
                     print('saved image at ' + save_dir + f"gif_ep{ep}_w{w}.gif")
         # optionally save model
