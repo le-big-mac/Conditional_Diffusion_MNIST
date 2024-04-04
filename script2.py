@@ -13,8 +13,7 @@ from model import ContextUnet, DDPM
 n_epoch = 20
 batch_size = 64
 n_T = 400 # 500
-# device = "cuda:0"
-device = "cpu"
+device = "cuda:0"
 n_classes = 10
 n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
