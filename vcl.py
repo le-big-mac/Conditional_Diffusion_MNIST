@@ -27,7 +27,7 @@ digit_datasets = get_split_MNIST()
 nn_model = ContextUnet(1, n_feat, n_classes, mle=True)
 ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
 ddpm.to(device)
-zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=5)
+zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
 optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 prior_mu, prior_logvar = stack_params(nn_model)
 
@@ -42,7 +42,7 @@ ddpm.to(device)
 
 for digit in range(n_classes):
     digit_data = digit_datasets[digit]
-    digit_loader = data.DataLoader(digit_data, batch_size=batch_size, shuffle=True, num_workers=5)
+    digit_loader = data.DataLoader(digit_data, batch_size=batch_size, shuffle=True, num_workers=0)
 
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
