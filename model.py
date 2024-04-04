@@ -242,6 +242,7 @@ class DDPM(nn.Module):
         context_mask = torch.bernoulli(torch.zeros_like(c)+self.drop_prob).to(self.device)
 
         # return MSE between added noise, and our predicted noise
+        x_t = x_t.unsqueeze(0)
         x_t = x_t.repeat(num_param_samples, 1, 1, 1, 1)
         noise = noise.repeat(num_param_samples, 1, 1, 1)
         param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
@@ -281,6 +282,7 @@ class DDPM(nn.Module):
             z = torch.randn(num_noise_samples, *size).to(device) if i > 1 else 0
 
             # split predictions and compute weighting
+            x_i = x_i.unsqueeze(0)
             x_i = x_i.repeat(num_param_samples, 1, 1, 1, 1)
             param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
             eps = param_sample_fn(x_i, c_i, t_is, context_mask).mean(dim=0)
