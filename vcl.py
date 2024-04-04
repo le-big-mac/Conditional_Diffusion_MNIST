@@ -53,6 +53,7 @@ else:
 
 nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp)
 ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 if not mle_comp:
     ddpm.load_state_dict(ddpm_mle.state_dict())
 ddpm.to(device)
