@@ -8,7 +8,7 @@ from model import ContextUnet, DDPM
 from utils import eval, stack_params, train_epoch
 
 n_epoch = 20
-batch_size = 64
+batch_size = 256
 n_T = 400 # 500
 device = "cuda:0"
 n_classes = 10
