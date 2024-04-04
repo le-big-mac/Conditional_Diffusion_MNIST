@@ -5,8 +5,8 @@
 #SBATCH --time=2:00:00
 #SBATCH --clusters=htc
 #SBATCH --job-name=vcl-diff
-#SBATCH --gres=gpu:1
-#SBATCH --mem-per-cpu=12G
+#SBATCH --gres=gpu:1 --constraint='gpu_mem:32GB'
+#SBATCH --mem-per-cpu=16G
 #SBATCH --output=reports/%j.out
 
 module load Anaconda3/2023.09-0
