@@ -8,7 +8,7 @@ from model import ContextUnet, DDPM
 from utils import eval, stack_params, train_epoch
 
 n_epoch = 20
-batch_size = 256
+batch_size = 64
 n_T = 400 # 500
 device = "cuda:0"
 n_classes = 10
@@ -37,6 +37,7 @@ for ep in range(n_epoch):
     train_epoch(ddpm, zero_loader, optim, device)
 
 nn_model = ContextUnet(1, n_feat, n_classes, mle=False)
+nn_model.load_state_dict(ddpm.nn_model.state_dict())
 ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
 ddpm.to(device)
 
