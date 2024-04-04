@@ -33,12 +33,12 @@ class ResidualConvBlock(nn.Module):
         self.is_res = is_res
         self.conv1 = nn.Sequential(
             bl.Conv2d(in_channels, out_channels, 3, 1, 1, mle=mle),
-            nn.BatchNorm2d(out_channels),
+            nn.BatchNorm2d(out_channels, track_running_stats=False),
             nn.GELU(),
         )
         self.conv2 = nn.Sequential(
             bl.Conv2d(out_channels, out_channels, 3, 1, 1, mle=mle),
-            nn.BatchNorm2d(out_channels),
+            nn.BatchNorm2d(out_channels, track_running_stats=False),
             nn.GELU(),
         )
 
@@ -242,11 +242,11 @@ class DDPM(nn.Module):
         context_mask = torch.bernoulli(torch.zeros_like(c)+self.drop_prob).to(self.device)
 
         # return MSE between added noise, and our predicted noise
-        x_t = x_t.unsqueeze(0)
         x_t = x_t.repeat(num_param_samples, 1, 1, 1, 1)
-        noise = noise.repeat(num_param_samples, 1, 1, 1)
         param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
         out = param_sample_fn(x_t, c, _ts / self.n_T, context_mask).reshape(x_t.shape[0] * x_t.shape[1], *x_t.shape[2:])
+
+        noise = noise.repeat(num_param_samples, 1, 1, 1)
         return self.loss_mse(noise, out)
 
     def sample(self, num_noise_samples, num_classes, size, device, guide_w = 0.0, num_param_samples=10):
@@ -282,7 +282,6 @@ class DDPM(nn.Module):
             z = torch.randn(num_noise_samples, *size).to(device) if i > 1 else 0
 
             # split predictions and compute weighting
-            x_i = x_i.unsqueeze(0)
             x_i = x_i.repeat(num_param_samples, 1, 1, 1, 1)
             param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
             eps = param_sample_fn(x_i, c_i, t_is, context_mask).mean(dim=0)

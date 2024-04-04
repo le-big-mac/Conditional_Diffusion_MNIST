@@ -5,7 +5,7 @@ from torch.utils import data
 
 from mnist import get_split_MNIST
 from model import ContextUnet, DDPM
-from utils import eval, kld, stack_params, train_epoch
+from utils import eval, stack_params, train_epoch
 
 n_epoch = 20
 batch_size = 256

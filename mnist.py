@@ -22,7 +22,7 @@ def get_MNIST():
         download=True,
     )
 
-    train_dataset = TensorDataset(train_dataset.data / 255, train_dataset.targets)
+    train_dataset = TensorDataset(train_dataset.data.unsqueeze(1) / 255, train_dataset.targets)
 
     return train_dataset
 
