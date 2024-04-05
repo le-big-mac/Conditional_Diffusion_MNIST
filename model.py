@@ -33,12 +33,12 @@ class ResidualConvBlock(nn.Module):
         self.is_res = is_res
         self.conv1 = bl.Conv2d(in_channels, out_channels, 3, 1, 1, mle=mle)
         self.after_conv1 = nn.Sequential(
-            nn.BatchNorm2d(out_channels),
+            bl.BatchNorm2d(out_channels),
             nn.GELU(),
         )
         self.conv2 = bl.Conv2d(out_channels, out_channels, 3, 1, 1, mle=mle)
         self.after_conv2 = nn.Sequential(
-            nn.BatchNorm2d(out_channels),
+            bl.BatchNorm2d(out_channels),
             nn.GELU(),
         )
 
