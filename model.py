@@ -126,12 +126,13 @@ class EmbedFC_deterministic(nn.Module):
 
 
 class ContextUnet(nn.Module):
-    def __init__(self, in_channels, n_feat = 256, n_classes=10, mle=False):
+    def __init__(self, in_channels, n_feat = 256, n_classes=10, mle=False, deterministic_embed=False):
         super(ContextUnet, self).__init__()
 
         self.in_channels = in_channels
         self.n_feat = n_feat
         self.n_classes = n_classes
+        self.deterministic_embed = deterministic_embed
 
         self.init_conv = ResidualConvBlock(in_channels, n_feat, is_res=True, mle=mle)
 
@@ -140,15 +141,24 @@ class ContextUnet(nn.Module):
 
         self.to_vec = nn.Sequential(nn.AvgPool2d(7), nn.GELU())
 
-        # self.timeembed1 = EmbedFC(1, 2*n_feat, mle=mle)
-        # self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle)
-        # self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle)
-        # self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle)
+        self.timeembed1 = EmbedFC(1, 2*n_feat, mle=mle)
+        self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle)
 
-        self.timeembed1 = EmbedFC_deterministic(1, 2*n_feat)
-        self.timeembed2 = EmbedFC_deterministic(1, 1*n_feat)
-        self.contextembed1 = EmbedFC_deterministic(n_classes, 2*n_feat)
-        self.contextembed2 = EmbedFC_deterministic(n_classes, 1*n_feat)
+        if self.deterministic_embed:
+            self.contextembed1 = [EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)]
+            self.contextembed2 = [EmbedFC_deterministic(1, 1*n_feat) for _ in range(n_classes)]
+            self.c1_det_mean = nn.Parameter(torch.randn(1, 2*n_feat))
+            self.c2_det_mean = nn.Parameter(torch.randn(1, 1*n_feat))
+            self.c1_det_logvar = nn.Parameter(torch.randn(1, 2*n_feat))
+            self.c2_det_logvar = nn.Parameter(torch.randn(1, 1*n_feat))
+        else:
+            self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle)
+            self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle)
+
+        # self.timeembed1 = EmbedFC_deterministic(1, 2*n_feat)
+        # self.timeembed2 = EmbedFC_deterministic(1, 1*n_feat)
+        # self.contextembed1 = EmbedFC_deterministic(n_classes, 2*n_feat)
+        # self.contextembed2 = EmbedFC_deterministic(n_classes, 1*n_feat)
 
         self.up0_ct = bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=mle)
         self.up0 = nn.Sequential(
@@ -176,18 +186,40 @@ class ContextUnet(nn.Module):
         hiddenvec = self.to_vec(down2)
 
         # convert context to one hot embedding
-        c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
+        # c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
 
         # mask out context if context_mask == 1
         context_mask = context_mask[:, None]
-        context_mask = context_mask.repeat(1,self.n_classes)
-        context_mask = (-1*(1-context_mask)) # need to flip 0 <-> 1
-        c = c * context_mask
+
+        if self.deterministic_embed:
+            one_input = torch.ones((1,1)).type(torch.float).to(c.device)
+            def context_embed(embed_fns, det_mean, det_logvar):
+                cemb = []
+                for i in range(c.shape[0]):
+                    idx = c[i].item()
+                    if context_mask[i].item() == 0:
+                        cemb.append(embed_fns[idx](one_input))
+                    elif self.mle:
+                        cemb.append(det_mean)
+                    else:
+                        cemb.append(det_mean + torch.exp(0.5*det_logvar)*torch.randn_like(det_logvar))
+                return torch.cat(cemb, dim=0)
+
+            cemb1 = context_embed(self.contextembed1, self.c1_det_mean, self.c1_det_logvar).reshape(-1, 2*self.n_feat, 1, 1)
+            cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c1_det_logvar).reshape(-1, self.n_feat, 1, 1)
+
+        else:
+            # convert context to one hot embedding
+            c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
+            context_mask = context_mask.repeat(1,self.n_classes)
+            context_mask = (-1*(1-context_mask)) # need to flip 0 <-> 1
+            c = c * context_mask
+
+            cemb1 = self.contextembed1(c, num_param_samples).view(-1, self.n_feat * 2, 1, 1)
+            cemb2 = self.contextembed2(c, num_param_samples).view(-1, self.n_feat, 1, 1)
 
         # embed context, time step
-        cemb1 = self.contextembed1(c, num_param_samples).view(-1, self.n_feat * 2, 1, 1)
         temb1 = self.timeembed1(t, num_param_samples).view(-1, self.n_feat * 2, 1, 1)
-        cemb2 = self.contextembed2(c, num_param_samples).view(-1, self.n_feat, 1, 1)
         temb2 = self.timeembed2(t, num_param_samples).view(-1, self.n_feat, 1, 1)
 
         # could concatenate the context embedding here instead of adaGN
