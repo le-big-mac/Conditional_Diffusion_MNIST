@@ -43,7 +43,7 @@ if not mle_comp:
     ddpm_mle.to(device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
     optim = torch.optim.Adam(ddpm_mle.parameters(), lr=lrate)
-    for ep in range(n_epoch):
+    for ep in range(1):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         train_epoch(ddpm_mle, zero_loader, optim, device, num_param_samples=1)
@@ -55,10 +55,10 @@ else:
 
 nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp)
 ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 if not mle_comp:
     ddpm.load_state_dict(ddpm_mle.state_dict())
 ddpm.to(device)
+optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 
 for digit in range(n_classes):
     digit_data = digit_datasets[digit]
