@@ -24,6 +24,7 @@ n_classes = 10
 n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = False
+num_param_samples = 1 if mle_comp else 10
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -45,7 +46,7 @@ if not mle_comp:
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        train_epoch(ddpm_mle, zero_loader, optim, device)
+        train_epoch(ddpm_mle, zero_loader, optim, device, num_param_samples=1)
 
     ddpm_mle.cpu()
 else:
@@ -65,9 +66,10 @@ for digit in range(n_classes):
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp)
+        x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples)
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
-        save_gif = False
-        eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif)
+        if ep % 5 == 0 or ep == n_epoch - 1:
+            save_gif = False
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif)
 
     prior_mu, prior_logvar = stack_params(nn_model)
