@@ -28,17 +28,24 @@ class Linear(nn.Module):
             nn.init.zeros_(self.bias_mean)
             nn.init.constant_(self.bias_logvar, -6.)
 
-    def forward(self, x):
+    def forward(self, x, num_param_samples=10):
         if self.mle:
             return F.linear(x, self.weight_mean, self.bias_mean)
 
-        weight_std = torch.exp(0.5 * self.weight_logvar)
-        weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
-        bias = None
-        if self.bias_mean is not None:
-            bias_std = torch.exp(0.5 * self.bias_logvar)
-            bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
-        return F.linear(x, weight, bias)
+        x = x.reshape(num_param_samples, -1, *x.shape[1:])
+
+        def param_sample(x):
+            weight_std = torch.exp(0.5 * self.weight_logvar)
+            weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
+            bias = None
+            if self.bias_mean is not None:
+                bias_std = torch.exp(0.5 * self.bias_logvar)
+                bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
+
+            return F.linear(x, weight, bias)
+
+        return torch.vmap(param_sample, in_dims=0, randomness='different')(x).reshape(-1, *x.shape[2:])
+
 
 
 class Conv2d(nn.Module):
@@ -67,17 +74,22 @@ class Conv2d(nn.Module):
             nn.init.zeros_(self.bias_mean)
             nn.init.constant_(self.bias_logvar, -6.)
 
-    def forward(self, x):
+    def forward(self, x, num_param_samples=10):
         if self.mle:
             return F.conv2d(x, self.weight_mean, self.bias_mean, stride=self.stride, padding=self.padding)
 
-        weight_std = torch.exp(0.5 * self.weight_logvar)
-        weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
-        bias = None
-        if self.bias_mean is not None:
-            bias_std = torch.exp(0.5 * self.bias_logvar)
-            bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
-        return F.conv2d(x, weight, bias, stride=self.stride, padding=self.padding)
+        x = x.reshape(num_param_samples, -1, *x.shape[1:])
+
+        def param_sample(x):
+            weight_std = torch.exp(0.5 * self.weight_logvar)
+            weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
+            bias = None
+            if self.bias_mean is not None:
+                bias_std = torch.exp(0.5 * self.bias_logvar)
+                bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
+            return F.conv2d(x, weight, bias, stride=self.stride, padding=self.padding)
+
+        return torch.vmap(param_sample, in_dims=0, randomness='different')(x).reshape(-1, *x.shape[2:])
 
 
 class ConvTranspose2d(nn.Module):
@@ -106,14 +118,19 @@ class ConvTranspose2d(nn.Module):
             nn.init.zeros_(self.bias_mean)
             nn.init.constant_(self.bias_logvar, -6.)
 
-    def forward(self, x):
+    def forward(self, x, num_param_samples=10):
         if self.mle:
             return F.conv_transpose2d(x, self.weight_mean, self.bias_mean, stride=self.stride, padding=self.padding)
 
-        weight_std = torch.exp(0.5 * self.weight_logvar)
-        weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
-        bias = None
-        if self.bias_mean is not None:
-            bias_std = torch.exp(0.5 * self.bias_logvar)
-            bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
-        return F.conv_transpose2d(x, weight, bias, stride=self.stride, padding=self.padding)
+        x = x.reshape(num_param_samples, -1, *x.shape[1:])
+
+        def param_sample(x):
+            weight_std = torch.exp(0.5 * self.weight_logvar)
+            weight = self.weight_mean + weight_std * torch.randn_like(weight_std)
+            bias = None
+            if self.bias_mean is not None:
+                bias_std = torch.exp(0.5 * self.bias_logvar)
+                bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
+            return F.conv_transpose2d(x, weight, bias, stride=self.stride, padding=self.padding)
+
+        return torch.vmap(param_sample, in_dims=0, randomness='different')(x).reshape(-1, *x.shape[2:])

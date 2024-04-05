@@ -31,21 +31,23 @@ class ResidualConvBlock(nn.Module):
         '''
         self.same_channels = in_channels==out_channels
         self.is_res = is_res
-        self.conv1 = nn.Sequential(
-            bl.Conv2d(in_channels, out_channels, 3, 1, 1, mle=mle),
-            nn.BatchNorm2d(out_channels, track_running_stats=False),
+        self.conv1 = bl.Conv2d(in_channels, out_channels, 3, 1, 1, mle=mle)
+        self.after_conv1 = nn.Sequential(
+            nn.BatchNorm2d(out_channels),
             nn.GELU(),
         )
-        self.conv2 = nn.Sequential(
-            bl.Conv2d(out_channels, out_channels, 3, 1, 1, mle=mle),
-            nn.BatchNorm2d(out_channels, track_running_stats=False),
+        self.conv2 = bl.Conv2d(out_channels, out_channels, 3, 1, 1, mle=mle)
+        self.after_conv2 = nn.Sequential(
+            nn.BatchNorm2d(out_channels),
             nn.GELU(),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, num_param_samples=10) -> torch.Tensor:
         if self.is_res:
-            x1 = self.conv1(x)
-            x2 = self.conv2(x1)
+            x1 = self.conv1(x, num_param_samples)
+            x1 = self.after_conv1(x1)
+            x2 = self.conv2(x1, num_param_samples)
+            x2 = self.after_conv2(x2)
             # this adds on correct residual in case channels have increased
             if self.same_channels:
                 out = x + x2
@@ -53,8 +55,10 @@ class ResidualConvBlock(nn.Module):
                 out = x1 + x2
             return out / 1.414
         else:
-            x1 = self.conv1(x)
-            x2 = self.conv2(x1)
+            x1 = self.conv1(x, num_param_samples)
+            x1 = self.after_conv1(x1)
+            x2 = self.conv2(x1, num_param_samples)
+            x2 = self.after_conv2(x2)
             return x2
 
 
@@ -64,11 +68,12 @@ class UnetDown(nn.Module):
         '''
         process and downscale the image feature maps
         '''
-        layers = [ResidualConvBlock(in_channels, out_channels, mle=mle), nn.MaxPool2d(2)]
-        self.model = nn.Sequential(*layers)
+        self.res = ResidualConvBlock(in_channels, out_channels, mle=mle)
+        self.maxpool = nn.MaxPool2d(2)
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, x, num_param_samples=10):
+        x = self.res(x, num_param_samples)
+        return self.maxpool(x)
 
 
 class UnetUp(nn.Module):
@@ -77,17 +82,15 @@ class UnetUp(nn.Module):
         '''
         process and upscale the image feature maps
         '''
-        layers = [
-            bl.ConvTranspose2d(in_channels, out_channels, 2, 2, mle=mle),
-            ResidualConvBlock(out_channels, out_channels),
-            ResidualConvBlock(out_channels, out_channels),
-        ]
-        self.model = nn.Sequential(*layers)
+        self.ct = bl.ConvTranspose2d(in_channels, out_channels, 2, 2, mle=mle)
+        self.r1 = ResidualConvBlock(out_channels, out_channels, mle=mle)
+        self.r2 = ResidualConvBlock(out_channels, out_channels, mle=mle)
 
-    def forward(self, x, skip):
+    def forward(self, x, skip, num_param_samples=10):
         x = torch.cat((x, skip), 1)
-        x = self.model(x)
-        return x
+        x = self.ct(x, num_param_samples)
+        x = self.r1(x, num_param_samples)
+        return self.r2(x, num_param_samples)
 
 
 class EmbedFC(nn.Module):
@@ -97,16 +100,13 @@ class EmbedFC(nn.Module):
         generic one layer FC NN for embedding things
         '''
         self.input_dim = input_dim
-        layers = [
-            bl.Linear(input_dim, emb_dim, mle=mle),
-            nn.GELU(),
-            bl.Linear(emb_dim, emb_dim, mle=mle),
-        ]
-        self.model = nn.Sequential(*layers)
+        self.l1 = bl.Linear(input_dim, emb_dim, mle=mle)
+        self.l2 = bl.Linear(emb_dim, emb_dim, mle=mle)
 
-    def forward(self, x):
+    def forward(self, x, num_param_samples=10):
         x = x.view(-1, self.input_dim)
-        return self.model(x)
+        x = nn.functional.gelu(self.l1(x, num_param_samples))
+        return self.l2(x, num_param_samples)
 
 
 class ContextUnet(nn.Module):
@@ -129,29 +129,29 @@ class ContextUnet(nn.Module):
         self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle)
         self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle)
 
+        self.up0_ct = bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=mle)
         self.up0 = nn.Sequential(
             # nn.ConvTranspose2d(6 * n_feat, 2 * n_feat, 7, 7), # when concat temb and cemb end up w 6*n_feat
-            bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=mle), # otherwise just have 2*n_feat
             nn.GroupNorm(8, 2 * n_feat),
             nn.ReLU(),
         )
 
         self.up1 = UnetUp(4 * n_feat, n_feat, mle=mle)
         self.up2 = UnetUp(2 * n_feat, n_feat, mle=mle)
+        self.out_conv1 = bl.Conv2d(2 * n_feat, n_feat, 3, 1, 1, mle=mle)
         self.out = nn.Sequential(
-            bl.Conv2d(2 * n_feat, n_feat, 3, 1, 1, mle=mle),
             nn.GroupNorm(8, n_feat),
             nn.ReLU(),
-            bl.Conv2d(n_feat, self.in_channels, 3, 1, 1, mle=mle),
         )
+        self.out_conv2 = bl.Conv2d(n_feat, self.in_channels, 3, 1, 1, mle=mle)
 
-    def forward(self, x, c, t, context_mask):
+    def forward(self, x, c, t, context_mask, num_param_samples=10):
         # x is (noisy) image, c is context label, t is timestep,
         # context_mask says which samples to block the context on
 
-        x = self.init_conv(x)
-        down1 = self.down1(x)
-        down2 = self.down2(down1)
+        x = self.init_conv(x, num_param_samples)
+        down1 = self.down1(x, num_param_samples)
+        down2 = self.down2(down1, num_param_samples)
         hiddenvec = self.to_vec(down2)
 
         # convert context to one hot embedding
@@ -164,19 +164,21 @@ class ContextUnet(nn.Module):
         c = c * context_mask
 
         # embed context, time step
-        cemb1 = self.contextembed1(c).view(-1, self.n_feat * 2, 1, 1)
-        temb1 = self.timeembed1(t).view(-1, self.n_feat * 2, 1, 1)
-        cemb2 = self.contextembed2(c).view(-1, self.n_feat, 1, 1)
-        temb2 = self.timeembed2(t).view(-1, self.n_feat, 1, 1)
+        cemb1 = self.contextembed1(c, num_param_samples).view(-1, self.n_feat * 2, 1, 1)
+        temb1 = self.timeembed1(t, num_param_samples).view(-1, self.n_feat * 2, 1, 1)
+        cemb2 = self.contextembed2(c, num_param_samples).view(-1, self.n_feat, 1, 1)
+        temb2 = self.timeembed2(t, num_param_samples).view(-1, self.n_feat, 1, 1)
 
         # could concatenate the context embedding here instead of adaGN
         # hiddenvec = torch.cat((hiddenvec, temb1, cemb1), 1)
 
-        up1 = self.up0(hiddenvec)
+        up1 = self.up0(self.up0_ct(hiddenvec, num_param_samples))
         # up2 = self.up1(up1, down2) # if want to avoid add and multiply embeddings
         up2 = self.up1(cemb1*up1+ temb1, down2)  # add and multiply embeddings
         up3 = self.up2(cemb2*up2+ temb2, down1)
-        out = self.out(torch.cat((up3, x), 1))
+        out = self.out_conv1(torch.cat((up3, x), 1), num_param_samples)
+        out = self.out(out)
+        out = self.out_conv2(out, num_param_samples)
         return out
 
 
@@ -242,9 +244,8 @@ class DDPM(nn.Module):
         context_mask = torch.bernoulli(torch.zeros_like(c)+self.drop_prob).to(self.device)
 
         # return MSE between added noise, and our predicted noise
-        x_t = x_t.repeat(num_param_samples, 1, 1, 1, 1)
-        param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
-        out = param_sample_fn(x_t, c, _ts / self.n_T, context_mask).reshape(x_t.shape[0] * x_t.shape[1], *x_t.shape[2:])
+        x_t = x_t.repeat(num_param_samples, 1, 1, 1)
+        out = self.nn_model(x_t, c, _ts / self.n_T, context_mask, num_param_samples)
 
         noise = noise.repeat(num_param_samples, 1, 1, 1)
         return self.loss_mse(noise, out)
@@ -282,9 +283,8 @@ class DDPM(nn.Module):
             z = torch.randn(num_noise_samples, *size).to(device) if i > 1 else 0
 
             # split predictions and compute weighting
-            x_sample = x_i.repeat(num_param_samples, 1, 1, 1, 1)
-            param_sample_fn = torch.vmap(self.nn_model, in_dims=(0, None, None, None), randomness='different')
-            eps = param_sample_fn(x_sample, c_i, t_is, context_mask).mean(dim=0)
+            x_sample = x_i.repeat(num_param_samples, 1, 1, 1)
+            eps = self.nn_model(x_sample, c_i, t_is, context_mask).reshape(num_param_samples, -1, *size).mean(dim=0)
 
             # eps = self.nn_model(x_i, c_i, t_is, context_mask)
             eps1 = eps[:num_noise_samples]
