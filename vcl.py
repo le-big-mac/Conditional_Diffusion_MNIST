@@ -15,7 +15,7 @@ parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs')
 parser.add_argument('--gamma', type=float, default=1.0, help='batch size')
 parser.add_argument('--lrate', type=float, default=1e-4, help='learning rate')
 parser.add_argument('--num_eval_samples', type=int, default=50, help='number of evaluation samples')
-parser.add_argument('--deterministic_embeddings', action='store_true', help='whether to use deterministic embeddings')
+parser.add_argument('--deterministic_embed', action='store_true', help='whether to use deterministic embeddings')
 
 args = parser.parse_args()
 print(args)
@@ -26,7 +26,7 @@ n_epoch = args.n_epoch
 gamma = args.gamma
 lrate = args.lrate
 num_eval_samples = args.num_eval_samples
-deterministic_embeddings = args.deterministic_embeddings
+deterministic_embed = args.deterministic_embed
 batch_size = 256
 n_T = 400 # 500
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -45,7 +45,7 @@ digit_datasets = get_split_MNIST()
 
 if not mle_comp:
     # MLE pretraining
-    nn_model = ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embed=deterministic_embeddings)
+    nn_model = ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embed=deterministic_embed)
     ddpm_mle = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
     ddpm_mle.to(device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
@@ -61,7 +61,7 @@ if not mle_comp:
 else:
     prior_mu, prior_logvar = None, None
 
-nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embeddings)
+nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed)
 ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
 if not mle_comp:
     ddpm.load_state_dict(ddpm_mle.state_dict())

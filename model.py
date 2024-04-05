@@ -132,6 +132,7 @@ class ContextUnet(nn.Module):
         self.in_channels = in_channels
         self.n_feat = n_feat
         self.n_classes = n_classes
+        self.mle = mle
         self.deterministic_embed = deterministic_embed
 
         self.init_conv = ResidualConvBlock(in_channels, n_feat, is_res=True, mle=mle)
@@ -180,6 +181,9 @@ class ContextUnet(nn.Module):
         # x is (noisy) image, c is context label, t is timestep,
         # context_mask says which samples to block the context on
 
+        x = x.repeat(num_param_samples, 1, 1, 1)
+        t = t.repeat(num_param_samples, 1, 1, 1)
+
         x = self.init_conv(x, num_param_samples)
         down1 = self.down1(x, num_param_samples)
         down2 = self.down2(down1, num_param_samples)
@@ -191,24 +195,31 @@ class ContextUnet(nn.Module):
         # mask out context if context_mask == 1
         context_mask = context_mask[:, None]
 
+        # if we only allow one c at a time we can make this faster
+
         if self.deterministic_embed:
             one_input = torch.ones((1,1)).type(torch.float).to(c.device)
-            def context_embed(embed_fns, det_mean, det_logvar):
-                cemb = []
-                for i in range(c.shape[0]):
-                    idx = c[i].item()
-                    if context_mask[i].item() == 0:
-                        cemb.append(embed_fns[idx](one_input))
-                    elif self.mle:
-                        cemb.append(det_mean)
-                    else:
-                        cemb.append(det_mean + torch.exp(0.5*det_logvar)*torch.randn_like(det_logvar))
-                return torch.cat(cemb, dim=0)
+            c = c + (context_mask) * 10
+            class_indices = [torch.where(c==i)[0] for i in range(self.n_classes)]
+            mask_indices = torch.where(context_mask==1)[0]
 
-            cemb1 = context_embed(self.contextembed1, self.c1_det_mean, self.c1_det_logvar).reshape(-1, 2*self.n_feat, 1, 1)
-            cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c1_det_logvar).reshape(-1, self.n_feat, 1, 1)
+            def context_embed(embed_fns, det_mean, det_logvar, out_shape):
+                cemb = torch.empty((c.shape[0], out_shape)).to(c.device)
+                if self.mle:
+                    cemb[mask_indices] = det_mean
+                else:
+                    cemb[mask_indices] = det_mean + torch.exp(0.5*det_logvar)*torch.randn_like(det_logvar)
+                for i in range(self.n_classes):
+                    cemb[class_indices[i]] = embed_fns[i](one_input)
+
+                return cemb.reshape(-1, out_shape, 1, 1).repeat(num_param_samples, 1, 1, 1)
+
+            cemb1 = context_embed(self.contextembed1, self.c1_det_mean, self.c1_det_logvar, 2*self.n_feat)
+            cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c1_det_logvar, self.n_feat)
 
         else:
+            c = c.repeat(num_param_samples)
+            context_mask = context_mask.repeat(num_param_samples)
             # convert context to one hot embedding
             c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
             context_mask = context_mask.repeat(1,self.n_classes)
@@ -297,10 +308,6 @@ class DDPM(nn.Module):
         context_mask = torch.bernoulli(torch.zeros_like(c)+self.drop_prob).to(self.device)
 
         # return MSE between added noise, and our predicted noise
-        x_t = x_t.repeat(num_param_samples, 1, 1, 1)
-        c = c.repeat(num_param_samples)
-        _ts = _ts.repeat(num_param_samples)
-        context_mask = context_mask.repeat(num_param_samples)
         out = self.nn_model(x_t, c, _ts / self.n_T, context_mask, num_param_samples)
 
         noise = noise.repeat(num_param_samples, 1, 1, 1)
@@ -339,11 +346,7 @@ class DDPM(nn.Module):
             z = torch.randn(num_noise_samples, *size).to(device) if i > 1 else 0
 
             # split predictions and compute weighting
-            x_sample = x_i.repeat(num_param_samples, 1, 1, 1)
-            c_sample = c_i.repeat(num_param_samples)
-            t_sample = t_is.repeat(num_param_samples, 1, 1, 1)
-            context_mask_sample = context_mask.repeat(num_param_samples)
-            eps = self.nn_model(x_sample, c_sample, t_sample, context_mask_sample, num_param_samples).reshape(num_param_samples, -1, *size).mean(dim=0)
+            eps = self.nn_model(x_i, c_i, t_is, context_mask, num_param_samples).reshape(num_param_samples, -1, *size).mean(dim=0)
 
             # eps = self.nn_model(x_i, c_i, t_is, context_mask)
             eps1 = eps[:num_noise_samples]
