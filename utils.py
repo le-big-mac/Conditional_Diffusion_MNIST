@@ -36,18 +36,27 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
         optim.zero_grad()
         x = x.to(device)
         c = c.to(device)
-        loss = ddpm(x, c, num_param_samples)
-        if not mle:
-            print('Devices:')
-            print(loss.get_device())
-            print(prior_mu.get_device())
-            print(prior_logvar.get_device())
-            for param in ddpm.parameters():
-                print(param.get_device())
-            print(kld(ddpm, prior_mu, prior_logvar / len(dataloader.dataset)).get_device())
-            loss += (kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset))
-            print(loss.get_device())
-        loss.backward()
+        try:
+            loss = ddpm(x, c, num_param_samples)
+            if not mle:
+                loss += (kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset))
+            loss.backward()
+        except RuntimeError as e:
+            print("Exception caught:")
+            print(e)
+            # Print the devices of all tensors involved
+            print("Devices:")
+            print(f"loss: {loss.device}")
+            print(f"x: {x.device}")
+            print(f"c: {c.device}")
+            for name, param in ddpm.named_parameters():
+                print(f"{name}: {param.device}")
+            if not mle:
+                print((kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)).device)
+                print(f"prior_mu: {prior_mu.device}")
+                print(f"prior_logvar: {prior_logvar.device}")
+            raise e
+
         if loss_ema is None:
             loss_ema = loss.item()
         else:
