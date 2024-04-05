@@ -215,7 +215,7 @@ class ContextUnet(nn.Module):
                 return cemb.reshape(-1, out_shape, 1, 1).repeat(num_param_samples, 1, 1, 1)
 
             cemb1 = context_embed(self.contextembed1, self.c1_det_mean, self.c1_det_logvar, 2*self.n_feat)
-            cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c1_det_logvar, self.n_feat)
+            cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c2_det_logvar, self.n_feat)
 
         else:
             c = c.repeat(num_param_samples)
