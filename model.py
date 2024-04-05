@@ -121,8 +121,8 @@ class EmbedFC_deterministic(nn.Module):
 
     def forward(self, x, num_param_samples=10):
         x = x.view(-1, self.input_dim)
-        x = nn.functional.gelu(self.l1(x, num_param_samples))
-        return self.l2(x, num_param_samples)
+        x = nn.functional.gelu(self.l1(x))
+        return self.l2(x)
 
 
 class ContextUnet(nn.Module):
