@@ -146,8 +146,8 @@ class ContextUnet(nn.Module):
         self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle)
 
         if self.deterministic_embed:
-            self.contextembed1 = [EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)]
-            self.contextembed2 = [EmbedFC_deterministic(1, 1*n_feat) for _ in range(n_classes)]
+            self.contextembed1 = nn.ModuleList([EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)])
+            self.contextembed2 = nn.ModuleList([EmbedFC_deterministic(1, 1*n_feat) for _ in range(n_classes)])
             self.c1_det_mean = nn.Parameter(torch.randn(1, 2*n_feat))
             self.c2_det_mean = nn.Parameter(torch.randn(1, 1*n_feat))
             self.c1_det_logvar = nn.Parameter(torch.randn(1, 2*n_feat))
