@@ -43,6 +43,7 @@ class ResidualConvBlock(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, num_param_samples=10) -> torch.Tensor:
+        print(num_param_samples)
         if self.is_res:
             x1 = self.conv1(x, num_param_samples)
             x1 = self.after_conv1(x1)
@@ -174,8 +175,8 @@ class ContextUnet(nn.Module):
 
         up1 = self.up0(self.up0_ct(hiddenvec, num_param_samples))
         # up2 = self.up1(up1, down2) # if want to avoid add and multiply embeddings
-        up2 = self.up1(cemb1*up1+ temb1, down2)  # add and multiply embeddings
-        up3 = self.up2(cemb2*up2+ temb2, down1)
+        up2 = self.up1(cemb1*up1+ temb1, down2, num_param_samples)  # add and multiply embeddings
+        up3 = self.up2(cemb2*up2+ temb2, down1, num_param_samples)
         out = self.out_conv1(torch.cat((up3, x), 1), num_param_samples)
         out = self.out(out)
         out = self.out_conv2(out, num_param_samples)
@@ -290,7 +291,7 @@ class DDPM(nn.Module):
             c_sample = c_i.repeat(num_param_samples)
             t_sample = t_is.repeat(num_param_samples, 1, 1, 1)
             context_mask_sample = context_mask.repeat(num_param_samples)
-            eps = self.nn_model(x_sample, c_sample, t_sample, context_mask_sample).reshape(num_param_samples, -1, *size).mean(dim=0)
+            eps = self.nn_model(x_sample, c_sample, t_sample, context_mask_sample, num_param_samples).reshape(num_param_samples, -1, *size).mean(dim=0)
 
             # eps = self.nn_model(x_i, c_i, t_is, context_mask)
             eps1 = eps[:num_noise_samples]
