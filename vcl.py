@@ -12,7 +12,7 @@ parser = argparse.ArgumentParser(description='Conditional Diffusion MNIST')
 parser.add_argument('--save_dir', type=str, help='directory to save the results')
 parser.add_argument('--mle_comp', action='store_true', help='whether to use compute MLE comparison')
 parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs')
-parser.add_argument('--gamma', type=int, default=1.0, help='batch size')
+parser.add_argument('--gamma', type=float, default=1.0, help='batch size')
 
 args = parser.parse_args()
 
