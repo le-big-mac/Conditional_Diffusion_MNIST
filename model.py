@@ -109,6 +109,22 @@ class EmbedFC(nn.Module):
         return self.l2(x, num_param_samples)
 
 
+class EmbedFC_deterministic(nn.Module):
+    def __init__(self, input_dim, emb_dim, mle=False):
+        super(EmbedFC, self).__init__()
+        '''
+        generic one layer FC NN for embedding things
+        '''
+        self.input_dim = input_dim
+        self.l1 = nn.Linear(input_dim, emb_dim)
+        self.l2 = nn.Linear(emb_dim, emb_dim)
+
+    def forward(self, x, num_param_samples=10):
+        x = x.view(-1, self.input_dim)
+        x = nn.functional.gelu(self.l1(x, num_param_samples))
+        return self.l2(x, num_param_samples)
+
+
 class ContextUnet(nn.Module):
     def __init__(self, in_channels, n_feat = 256, n_classes=10, mle=False):
         super(ContextUnet, self).__init__()
