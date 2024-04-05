@@ -25,6 +25,7 @@ n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = False
 num_param_samples = 1 if mle_comp else 10
+num_eval_samples = 1 if mle_comp else 25
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -70,6 +71,6 @@ for digit in range(n_classes):
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         if ep % 5 == 0 or ep == n_epoch - 1:
             save_gif = False
-            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_param_samples)
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
 
     prior_mu, prior_logvar = stack_params(nn_model)
