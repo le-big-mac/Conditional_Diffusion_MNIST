@@ -72,7 +72,7 @@ for digit in range(n_classes):
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         if ep % 5 == 0 or ep == n_epoch - 1:
             save_gif = False
-            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=1)
 
     prior_mu, prior_logvar = stack_params(nn_model)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
