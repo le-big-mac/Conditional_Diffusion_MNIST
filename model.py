@@ -189,14 +189,6 @@ class ContextUnet(nn.Module):
         down2 = self.down2(down1, num_param_samples)
         hiddenvec = self.to_vec(down2)
 
-        # convert context to one hot embedding
-        # c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
-
-        # mask out context if context_mask == 1
-        context_mask = context_mask[:, None]
-
-        # if we only allow one c at a time we can make this faster
-
         if self.deterministic_embed:
             one_input = torch.ones((1,1)).type(torch.float).to(c.device)
             c = c + (context_mask) * 10
@@ -204,21 +196,27 @@ class ContextUnet(nn.Module):
             mask_indices = torch.where(context_mask==1)[0]
 
             def context_embed(embed_fns, det_mean, det_logvar, out_shape):
-                cemb = torch.empty((c.shape[0], out_shape)).to(c.device)
-                if self.mle:
-                    cemb[mask_indices] = det_mean
-                else:
-                    cemb[mask_indices] = det_mean + torch.exp(0.5*det_logvar)*torch.randn_like(det_logvar)
+                cemb = torch.empty((c.shape[0], out_shape), dtype=torch.float).to(c.device)
+                print(cemb.shape)
                 for i in range(self.n_classes):
                     cemb[class_indices[i]] = embed_fns[i](one_input)
+                cemb = cemb.repeat(num_param_samples, 1, 1)
+                print(cemb.shape)
+                for i in range(num_param_samples):
+                    if self.mle:
+                        cemb[i][mask_indices] = det_mean
+                    else:
+                        cemb[i][mask_indices] = det_mean + torch.randn_like(det_mean) * torch.exp(0.5 * det_logvar)
 
-                return cemb.reshape(-1, out_shape, 1, 1).repeat(num_param_samples, 1, 1, 1)
+                return cemb.reshape(-1, out_shape, 1, 1)
 
             cemb1 = context_embed(self.contextembed1, self.c1_det_mean, self.c1_det_logvar, 2*self.n_feat)
             cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c2_det_logvar, self.n_feat)
 
         else:
             c = c.repeat(num_param_samples)
+            # mask out context if context_mask == 1
+            context_mask = context_mask[:, None]
             context_mask = context_mask.repeat(num_param_samples)
             # convert context to one hot embedding
             c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
