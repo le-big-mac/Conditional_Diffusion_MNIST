@@ -16,29 +16,16 @@ def stack_params(model):
             logvar.append(param.view(-1))
 
     stacked_mu, stacked_logvar = torch.cat(mu), torch.cat(logvar)
-    print(f"stacked_mu device: {stacked_mu.device}")
-    print(f"stacked_logvar device: {stacked_logvar.device}")
     return stacked_mu, stacked_logvar
 
 
 def kld(model, prior_mu, prior_logvar):
     mu, logvar = stack_params(model)
 
-    print(f"mu device: {mu.device}")
-    print(f"logvar device: {logvar.device}")
-
-    print(f"prior_mu device: {prior_mu.device}")
-    print(f"prior_logvar device: {prior_logvar.device}")
-
     log_std_diff = prior_logvar - logvar
     mu_diff = (torch.exp(logvar) + (mu - prior_mu)**2) / torch.exp(prior_logvar)
 
-    print(f"log_std_diff device: {log_std_diff.device}")
-    print(f"mu_diff device: {mu_diff.device}")
-
-    kld = 0.5 * torch.sum(log_std_diff + mu_diff - 1)
-    print(f"kld device: {kld.device}")
-    return kld
+    return 0.5 * torch.sum(log_std_diff + mu_diff - 1)
 
 
 def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=None, prior_logvar=None, mle=True):
@@ -55,34 +42,36 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
         optim.zero_grad()
         x = x.to(device)
         c = c.to(device)
-        try:
-            loss = ddpm(x, c, num_param_samples)
-            if not mle:
-                kld_loss =  (kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset))
-                kld_loss.register_hook(print_grad_device("kld_loss"))
-                loss += kld_loss
 
-            # Register hooks for model parameters
-            for name, param in ddpm.named_parameters():
-                if param.requires_grad:
-                    param.register_hook(print_grad_device(name))
+        with torch.autograd.detect_anomaly():
+            try:
+                loss = ddpm(x, c, num_param_samples)
+                if not mle:
+                    kld_loss =  (kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset))
+                    kld_loss.register_hook(print_grad_device("kld_loss"))
+                    loss += kld_loss
 
-            loss.backward()
-        except RuntimeError as e:
-            print("Exception caught:")
-            print(e)
-            # Print the devices of all tensors involved
-            print("Devices:")
-            print(f"loss: {loss.device}")
-            print(f"x: {x.device}")
-            print(f"c: {c.device}")
-            for name, param in ddpm.named_parameters():
-                print(f"{name}: {param.device}")
-            if not mle:
-                print((kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)).device)
-                print(f"prior_mu: {prior_mu.device}")
-                print(f"prior_logvar: {prior_logvar.device}")
-            raise e
+                # Register hooks for model parameters
+                for name, param in ddpm.named_parameters():
+                    if param.requires_grad:
+                        param.register_hook(print_grad_device(name))
+
+                loss.backward()
+            except RuntimeError as e:
+                print("Exception caught:")
+                print(e)
+                # Print the devices of all tensors involved
+                print("Devices:")
+                print(f"loss: {loss.device}")
+                print(f"x: {x.device}")
+                print(f"c: {c.device}")
+                for name, param in ddpm.named_parameters():
+                    print(f"{name}: {param.device}")
+                if not mle:
+                    print((kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)).device)
+                    print(f"prior_mu: {prior_mu.device}")
+                    print(f"prior_logvar: {prior_logvar.device}")
+                raise e
 
         if loss_ema is None:
             loss_ema = loss.item()
