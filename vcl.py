@@ -14,6 +14,7 @@ parser.add_argument('--mle_comp', action='store_true', help='whether to use comp
 parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs')
 parser.add_argument('--gamma', type=float, default=1.0, help='batch size')
 parser.add_argument('--lrate', type=float, default=1e-4, help='learning rate')
+parser.add_argument('--num_eval_samples', type=int, default=50, help='number of evaluation samples')
 
 args = parser.parse_args()
 
@@ -22,6 +23,7 @@ mle_comp = args.mle_comp
 n_epoch = args.n_epoch
 gamma = args.gamma
 lrate = args.lrate
+num_eval_samples = args.num_eval_samples
 batch_size = 256
 n_T = 400 # 500
 device = "cuda:0"
@@ -76,7 +78,7 @@ for digit in range(n_classes):
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         if ep % 5 == 0 or ep == n_epoch - 1:
             save_gif = False
-            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=1)
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
 
     prior_mu, prior_logvar = stack_params(nn_model)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()

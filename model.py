@@ -140,15 +140,15 @@ class ContextUnet(nn.Module):
 
         self.to_vec = nn.Sequential(nn.AvgPool2d(7), nn.GELU())
 
-        self.timeembed1 = EmbedFC(1, 2*n_feat, mle=mle)
-        self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle)
-        self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle)
-        self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle)
+        # self.timeembed1 = EmbedFC(1, 2*n_feat, mle=mle)
+        # self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle)
+        # self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle)
+        # self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle)
 
-        # self.timeembed1 = EmbedFC_deterministic(1, 2*n_feat)
-        # self.timeembed2 = EmbedFC_deterministic(1, 1*n_feat)
-        # self.contextembed1 = EmbedFC_deterministic(n_classes, 2*n_feat)
-        # self.contextembed2 = EmbedFC_deterministic(n_classes, 1*n_feat)
+        self.timeembed1 = EmbedFC_deterministic(1, 2*n_feat)
+        self.timeembed2 = EmbedFC_deterministic(1, 1*n_feat)
+        self.contextembed1 = EmbedFC_deterministic(n_classes, 2*n_feat)
+        self.contextembed2 = EmbedFC_deterministic(n_classes, 1*n_feat)
 
         self.up0_ct = bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=mle)
         self.up0 = nn.Sequential(

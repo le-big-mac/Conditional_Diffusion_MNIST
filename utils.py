@@ -59,7 +59,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
     return x, c
 
 
-def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.0, 0.5, 2.0], save_gif=False, num_eval_samples=10):
+def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[2.0, 5.0], save_gif=False, num_eval_samples=10):
     ddpm.eval()
     with torch.no_grad():
         n_noise_samples = 4 * n_classes
