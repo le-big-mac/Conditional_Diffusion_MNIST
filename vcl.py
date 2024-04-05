@@ -25,7 +25,6 @@ n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = False
 num_param_samples = 1 if mle_comp else 10
-num_eval_samples = 1 if mle_comp else 25
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -33,6 +32,7 @@ if not os.path.exists(save_dir):
 for i in range(n_classes):
     if not os.path.exists(f"{save_dir}/{i}"):
         os.makedirs(f"{save_dir}/{i}")
+os.makedirs(f"{save_dir}/mle/")
 
 digit_datasets = get_split_MNIST()
 
@@ -47,7 +47,7 @@ if not mle_comp:
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         train_epoch(ddpm_mle, zero_loader, optim, device, num_param_samples=1)
-
+    eval(19, ddpm_mle, 1, f"{save_dir}/mle/", device, num_eval_samples=1)
     prior_mu, prior_logvar = stack_params(nn_model)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
     ddpm_mle.cpu()
