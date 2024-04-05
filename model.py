@@ -245,6 +245,9 @@ class DDPM(nn.Module):
 
         # return MSE between added noise, and our predicted noise
         x_t = x_t.repeat(num_param_samples, 1, 1, 1)
+        c = c.repeat(num_param_samples)
+        _ts = _ts.repeat(num_param_samples)
+        context_mask = context_mask.repeat(num_param_samples)
         out = self.nn_model(x_t, c, _ts / self.n_T, context_mask, num_param_samples)
 
         noise = noise.repeat(num_param_samples, 1, 1, 1)
@@ -284,7 +287,10 @@ class DDPM(nn.Module):
 
             # split predictions and compute weighting
             x_sample = x_i.repeat(num_param_samples, 1, 1, 1)
-            eps = self.nn_model(x_sample, c_i, t_is, context_mask).reshape(num_param_samples, -1, *size).mean(dim=0)
+            c_sample = c_i.repeat(num_param_samples)
+            t_sample = t_is.repeat(num_param_samples, 1, 1, 1)
+            context_mask_sample = context_mask.repeat(num_param_samples)
+            eps = self.nn_model(x_sample, c_sample, t_sample, context_mask_sample).reshape(num_param_samples, -1, *size).mean(dim=0)
 
             # eps = self.nn_model(x_i, c_i, t_is, context_mask)
             eps1 = eps[:num_noise_samples]
