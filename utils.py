@@ -44,6 +44,11 @@ def kld(model, prior_mu, prior_logvar):
 def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=None, prior_logvar=None, mle=True):
     ddpm.train()
 
+    def print_grad_device(name):
+        def hook(grad):
+            print(f"Gradient of {name} is on device: {grad.device}")
+        return hook
+
     pbar = tqdm(dataloader)
     loss_ema = None
     for x, c in pbar:
@@ -53,7 +58,15 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
         try:
             loss = ddpm(x, c, num_param_samples)
             if not mle:
-                loss += (kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset))
+                kld_loss =  (kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset))
+                kld_loss.register_hook(print_grad_device("kld_loss"))
+                loss += kld_loss
+
+            # Register hooks for model parameters
+            for name, param in ddpm.named_parameters():
+                if param.requires_grad:
+                    param.register_hook(print_grad_device(name))
+
             loss.backward()
         except RuntimeError as e:
             print("Exception caught:")
