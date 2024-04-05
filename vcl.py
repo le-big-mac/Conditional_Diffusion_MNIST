@@ -28,7 +28,7 @@ num_eval_samples = args.num_eval_samples
 deterministic_embeddings = args.deterministic_embeddings
 batch_size = 256
 n_T = 400 # 500
-device = "cuda:0"
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 n_classes = 10
 n_feat = 128 # 128 ok, 256 better (but slower)
 save_model = False
@@ -44,7 +44,7 @@ digit_datasets = get_split_MNIST()
 
 if not mle_comp:
     # MLE pretraining
-    nn_model = ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embeddings=deterministic_embeddings)
+    nn_model = ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embed=deterministic_embeddings)
     ddpm_mle = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
     ddpm_mle.to(device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
@@ -60,7 +60,7 @@ if not mle_comp:
 else:
     prior_mu, prior_logvar = None, None
 
-nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embeddings=deterministic_embeddings)
+nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embeddings)
 ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
 if not mle_comp:
     ddpm.load_state_dict(ddpm_mle.state_dict())
