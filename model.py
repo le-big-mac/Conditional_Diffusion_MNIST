@@ -111,7 +111,7 @@ class EmbedFC(nn.Module):
 
 class EmbedFC_deterministic(nn.Module):
     def __init__(self, input_dim, emb_dim):
-        super(EmbedFC, self).__init__()
+        super(EmbedFC_deterministic, self).__init__()
         '''
         generic one layer FC NN for embedding things
         '''
