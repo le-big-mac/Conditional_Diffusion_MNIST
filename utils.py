@@ -43,7 +43,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
             print(prior_mu.get_device())
             print(prior_logvar.get_device())
             print(next(ddpm.parameters()).get_device())
-            print(kld(ddpm, prior_mu, prior_logvar).get_device())
+            print(kld(ddpm, prior_mu, prior_logvar / len(dataloader.dataset)).get_device())
             loss += kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)
         loss.backward()
         if loss_ema is None:
