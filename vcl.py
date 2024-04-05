@@ -49,6 +49,7 @@ if not mle_comp:
         train_epoch(ddpm_mle, zero_loader, optim, device, num_param_samples=1)
 
     prior_mu, prior_logvar = stack_params(nn_model)
+    prior_mu, prior_logvar = prior_mu.detach(), prior_logvar.detach()
     ddpm_mle.cpu()
 else:
     prior_mu, prior_logvar = None, None
@@ -74,3 +75,4 @@ for digit in range(n_classes):
             eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
 
     prior_mu, prior_logvar = stack_params(nn_model)
+    prior_mu.detach(), prior_logvar.detach()
