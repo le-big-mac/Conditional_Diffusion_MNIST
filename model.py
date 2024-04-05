@@ -197,11 +197,9 @@ class ContextUnet(nn.Module):
 
             def context_embed(embed_fns, det_mean, det_logvar, out_shape):
                 cemb = torch.empty((c.shape[0], out_shape), dtype=torch.float).to(c.device)
-                print(cemb.shape)
                 for i in range(self.n_classes):
                     cemb[class_indices[i]] = embed_fns[i](one_input)
                 cemb = cemb.repeat(num_param_samples, 1, 1)
-                print(cemb.shape)
                 for i in range(num_param_samples):
                     if self.mle:
                         cemb[i][mask_indices] = det_mean
