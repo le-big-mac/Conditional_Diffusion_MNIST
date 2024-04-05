@@ -43,7 +43,6 @@ class ResidualConvBlock(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, num_param_samples=10) -> torch.Tensor:
-        print(num_param_samples)
         if self.is_res:
             x1 = self.conv1(x, num_param_samples)
             x1 = self.after_conv1(x1)
