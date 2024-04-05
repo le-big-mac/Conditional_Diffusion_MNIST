@@ -38,11 +38,12 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
         x = x.to(device)
         c = c.to(device)
 
-        mle = ddpm(x, c, num_param_samples)
-        loss = mle
+        loss = ddpm(x, c, num_param_samples)
+        mle_val = loss.item()
         if not mle:
             kl = gamma * kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)
             loss += kl
+            kl = kl.item()
         if loss_ema is None:
             loss_ema = loss.item()
         else:
@@ -50,7 +51,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
         if mle:
             pbar.set_description(f"loss: {loss_ema:.4f}")
         else:
-            pbar.set_description(f"loss: {loss_ema:.4f} kl: {kl.item():.4f} mle: {mle.item():.4f}")
+            pbar.set_description(f"loss: {loss_ema:.4f} kl: {kl:.4f} mle: {mle_val:.4f}")
         optim.step()
 
     return x, c
