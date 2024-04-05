@@ -18,6 +18,7 @@ parser.add_argument('--num_eval_samples', type=int, default=50, help='number of 
 parser.add_argument('--deterministic_embeddings', action='store_true', help='whether to use deterministic embeddings')
 
 args = parser.parse_args()
+print(args)
 
 save_dir = args.save_dir
 mle_comp = args.mle_comp
