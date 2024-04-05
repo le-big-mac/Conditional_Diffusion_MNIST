@@ -28,7 +28,7 @@ def kld(model, prior_mu, prior_logvar):
     return 0.5 * torch.sum(log_std_diff + mu_diff - 1)
 
 
-def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=None, prior_logvar=None, mle=True):
+def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=None, prior_logvar=None, gamma=None, mle=True):
     ddpm.train()
 
     pbar = tqdm(dataloader)
@@ -41,7 +41,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
         mle = ddpm(x, c, num_param_samples)
         loss = mle
         if not mle:
-            kl = kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)
+            kl = gamma * kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)
             loss += kl
         if loss_ema is None:
             loss_ema = loss.item()

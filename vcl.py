@@ -25,6 +25,7 @@ n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = False
 num_param_samples = 1 if mle_comp else 10
+gamma = 1.0
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -68,7 +69,7 @@ for digit in range(n_classes):
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples)
+        x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         if ep % 5 == 0 or ep == n_epoch - 1:
             save_gif = False
