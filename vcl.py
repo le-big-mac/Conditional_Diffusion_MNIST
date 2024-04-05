@@ -42,12 +42,12 @@ if not mle_comp:
     ddpm_mle.to(device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
     optim = torch.optim.Adam(ddpm_mle.parameters(), lr=lrate)
-    prior_mu, prior_logvar = stack_params(nn_model)
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         train_epoch(ddpm_mle, zero_loader, optim, device, num_param_samples=1)
 
+    prior_mu, prior_logvar = stack_params(nn_model)
     ddpm_mle.cpu()
 else:
     prior_mu, prior_logvar = None, None

@@ -44,7 +44,9 @@ class Linear(nn.Module):
 
             return F.linear(x, weight, bias)
 
-        return torch.vmap(param_sample, in_dims=0, randomness='different')(x).reshape(-1, *x.shape[2:])
+        out = torch.vmap(param_sample, in_dims=0, randomness='different')(x)
+        out = out.reshape(-1, *out.shape[2:])
+        return out
 
 
 
@@ -89,7 +91,9 @@ class Conv2d(nn.Module):
                 bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
             return F.conv2d(x, weight, bias, stride=self.stride, padding=self.padding)
 
-        return torch.vmap(param_sample, in_dims=0, randomness='different')(x).reshape(-1, *x.shape[2:])
+        out = torch.vmap(param_sample, in_dims=0, randomness='different')(x)
+        out = out.reshape(-1, *out.shape[2:])
+        return out
 
 
 class ConvTranspose2d(nn.Module):
@@ -133,4 +137,6 @@ class ConvTranspose2d(nn.Module):
                 bias = self.bias_mean + bias_std * torch.randn_like(bias_std)
             return F.conv_transpose2d(x, weight, bias, stride=self.stride, padding=self.padding)
 
-        return torch.vmap(param_sample, in_dims=0, randomness='different')(x).reshape(-1, *x.shape[2:])
+        out = torch.vmap(param_sample, in_dims=0, randomness='different')(x)
+        out = out.reshape(-1, *out.shape[2:])
+        return out
