@@ -15,16 +15,30 @@ def stack_params(model):
         elif name[-6:] == 'logvar':
             logvar.append(param.view(-1))
 
-    return torch.cat(mu), torch.cat(logvar)
+    stacked_mu, stacked_logvar = torch.cat(mu), torch.cat(logvar)
+    print(f"stacked_mu device: {stacked_mu.device}")
+    print(f"stacked_logvar device: {stacked_logvar.device}")
+    return stacked_mu, stacked_logvar
 
 
 def kld(model, prior_mu, prior_logvar):
     mu, logvar = stack_params(model)
 
+    print(f"mu device: {mu.device}")
+    print(f"logvar device: {logvar.device}")
+
+    print(f"prior_mu device: {prior_mu.device}")
+    print(f"prior_logvar device: {prior_logvar.device}")
+
     log_std_diff = prior_logvar - logvar
     mu_diff = (torch.exp(logvar) + (mu - prior_mu)**2) / torch.exp(prior_logvar)
 
-    return 0.5 * torch.sum(log_std_diff + mu_diff - 1)
+    print(f"log_std_diff device: {log_std_diff.device}")
+    print(f"mu_diff device: {mu_diff.device}")
+
+    kld = 0.5 * torch.sum(log_std_diff + mu_diff - 1)
+    print(f"kld device: {kld.device}")
+    return kld
 
 
 def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=None, prior_logvar=None, mle=True):
