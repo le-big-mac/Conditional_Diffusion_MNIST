@@ -45,6 +45,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
             loss += kl
             kl = kl.item()
         loss.backward()
+
         if loss_ema is None:
             loss_ema = loss.item()
         else:

@@ -13,6 +13,7 @@ parser.add_argument('--save_dir', type=str, help='directory to save the results'
 parser.add_argument('--mle_comp', action='store_true', help='whether to use compute MLE comparison')
 parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs')
 parser.add_argument('--gamma', type=float, default=1.0, help='batch size')
+parser.add_argument('--lrate', type=float, default=1e-4, help='learning rate')
 
 args = parser.parse_args()
 
@@ -20,12 +21,12 @@ save_dir = args.save_dir
 mle_comp = args.mle_comp
 n_epoch = args.n_epoch
 gamma = args.gamma
+lrate = args.lrate
 batch_size = 256
 n_T = 400 # 500
 device = "cuda:0"
 n_classes = 10
 n_feat = 128 # 128 ok, 256 better (but slower)
-lrate = 1e-4
 save_model = False
 num_param_samples = 1 if mle_comp else 10
 
