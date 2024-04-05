@@ -38,7 +38,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
         c = c.to(device)
         loss = ddpm(x, c, num_param_samples)
         if not mle:
-            loss += kld(ddpm.nn_model, prior_mu, prior_logvar) / len(dataloader.dataset)
+            loss += kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)
         loss.backward()
         if loss_ema is None:
             loss_ema = loss.item()

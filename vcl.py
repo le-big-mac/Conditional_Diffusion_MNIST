@@ -5,7 +5,7 @@ from torch.utils import data
 
 from mnist import get_split_MNIST
 from model import ContextUnet, DDPM
-from utils import eval, stack_params, train_epoch
+from utils import eval, stack_params, train_epoch, kld
 import argparse
 
 parser = argparse.ArgumentParser(description='Conditional Diffusion MNIST')
@@ -59,6 +59,10 @@ optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 if not mle_comp:
     ddpm.load_state_dict(ddpm_mle.state_dict())
 ddpm.to(device)
+print(prior_mu.get_device())
+print(prior_logvar.get_device())
+print(next(ddpm.parameters()).get_device())
+print(kld(ddpm, prior_mu, prior_logvar).get_device())
 
 for digit in range(n_classes):
     digit_data = digit_datasets[digit]
