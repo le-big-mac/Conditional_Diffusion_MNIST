@@ -11,12 +11,15 @@ import argparse
 parser = argparse.ArgumentParser(description='Conditional Diffusion MNIST')
 parser.add_argument('--save_dir', type=str, help='directory to save the results')
 parser.add_argument('--mle_comp', action='store_true', help='whether to use compute MLE comparison')
+parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs')
+parser.add_argument('--gamma', type=int, default=1.0, help='batch size')
 
 args = parser.parse_args()
 
 save_dir = args.save_dir
 mle_comp = args.mle_comp
-n_epoch = 20
+n_epoch = args.n_epoch
+gamma = args.gamma
 batch_size = 256
 n_T = 400 # 500
 device = "cuda:0"
@@ -25,7 +28,6 @@ n_feat = 128 # 128 ok, 256 better (but slower)
 lrate = 1e-4
 save_model = False
 num_param_samples = 1 if mle_comp else 10
-gamma = 1.0
 
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
@@ -44,7 +46,7 @@ if not mle_comp:
     ddpm_mle.to(device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
     optim = torch.optim.Adam(ddpm_mle.parameters(), lr=lrate)
-    for ep in range(n_epoch):
+    for ep in range(20):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         train_epoch(ddpm_mle, zero_loader, optim, device, num_param_samples=1)
