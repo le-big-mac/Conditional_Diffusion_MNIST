@@ -1,9 +1,10 @@
 import os
+import pickle
 
 import torch
 from torch.utils import data
 
-from mnist import get_split_MNIST
+from mnist import get_split_MNIST, get_random_coreset
 from model import ContextUnet, DDPM
 from utils import eval, stack_params, train_epoch
 import argparse
@@ -19,6 +20,8 @@ parser.add_argument('--deterministic_embed', action='store_true', help='whether 
 parser.add_argument('--logvar_init', type=float, default=-10.0, help='initial logvar value')
 parser.add_argument('--log_freq', type=int, default=20, help='logging frequency')
 parser.add_argument('--batch_size', type=int, default=256, help='batch size')
+parser.add_argument('--coreset_size', type=int, default=0, help='size of coreset')
+parser.add_argument('--fashion', action='store_true', help='use FashionMNIST instead of MNIST' )
 
 args = parser.parse_args()
 print(args)
@@ -40,16 +43,23 @@ n_feat = 128 # 128 ok, 256 better (but slower)
 save_model = True
 num_param_samples = 1 if mle_comp else 10
 
+coreset_size = args.coreset_size
+fashion = args.fashion
+
 os.makedirs(save_dir, exist_ok=True)
 
 for i in range(n_classes):
     os.makedirs(f"{save_dir}/{i}", exist_ok=True)
 os.makedirs(f"{save_dir}/mle/", exist_ok=True)
 
-digit_datasets = get_split_MNIST()
+digit_datasets = get_split_MNIST(fashion=fashion)
+if coreset_size > 0:
+    train_data, coresets = zip(*[(get_random_coreset(digit_data, coreset_size)) for digit_data in digit_datasets])
+    with open(f"{save_dir}/data_and_coresets.pkl", "wb") as f:
+        pickle.dump((train_data, coresets), f)
 
 if not mle_comp:
-    # MLE pretraining
+    # MLE pretraining for VCL
     nn_model = ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
     ddpm_mle = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
     ddpm_mle.to(device)
@@ -63,20 +73,33 @@ if not mle_comp:
     prior_mu, prior_logvar = stack_params(nn_model)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
     ddpm_mle.cpu()
+    prev_params = ddpm_mle.state_dict()
 else:
     prior_mu, prior_logvar = None, None
 
-nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
-ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-if not mle_comp:
-    ddpm.load_state_dict(ddpm_mle.state_dict())
-ddpm.to(device)
-optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+# No need to reinitialize model each class if we are not using coresets
+if coreset_size == 0:
+    nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
+    ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+    if not mle_comp:
+        ddpm.load_state_dict(prev_params)
+    ddpm.to(device)
+    optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 
 for digit in range(n_classes):
     digit_data = digit_datasets[digit]
     digit_loader = data.DataLoader(digit_data, batch_size=batch_size, shuffle=True, num_workers=0)
 
+    # Reinitialize with previous parameters if we are using coresets
+    if coreset_size > 0:
+        nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
+        ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+        if not mle_comp or digit > 0:
+            ddpm.load_state_dict(prev_params)
+        ddpm.to(device)
+        optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+
+    # Train on non-coreset data
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
@@ -86,9 +109,30 @@ for digit in range(n_classes):
             save_gif = False
             eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
 
+    # Extract prior for next class
+    prior_mu, prior_logvar = stack_params(ddpm)
+    prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
+
+    # Save model and prior
     if save_model:
-        torch.save({k : v.cpu() for k, v in ddpm.state_dict().items()}, save_dir + f"/model_{digit}.pth")
+        torch.save({k : v.cpu() for k, v in ddpm.state_dict().items()}, save_dir + f"/{digit}/model.pth")
+        with open(save_dir + f"/{digit}/prior.pkl", "wb") as f:
+            pickle.dump((prior_mu, prior_logvar), f)
         print('saved model at ' + save_dir + f"/model_{digit}.pth")
 
-    prior_mu, prior_logvar = stack_params(nn_model)
-    prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
+    # Train and evaluate on coreset data
+    if coreset_size > 0:
+        prev_params = {k : v.cpu() for k, v in ddpm.state_dict().items()}
+        for i in range(digit + 1):
+            nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
+            ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+            ddpm.load_state_dict(prev_params)
+            ddpm.to(device)
+            optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+            coreset_loader = data.DataLoader(coresets[i], batch_size=batch_size, shuffle=True, num_workers=0)
+            for ep in range(n_epoch):
+                print(f"Epoch {ep}")
+                optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
+                x, c = train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples, save_name=f"coreset_{i}")
+

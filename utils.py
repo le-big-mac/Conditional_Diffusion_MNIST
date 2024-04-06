@@ -59,15 +59,18 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
     return x, c
 
 
-def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 1.0, 2.0, 3.0], save_gif=False, num_eval_samples=10):
+def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 1.0, 2.0, 3.0], save_gif=False, num_eval_samples=10, save_name=None):
     ddpm.eval()
+    if save_name is None:
+        save_name = f"image_ep{ep}_w{{w}}.png"
+
     with torch.no_grad():
         n_noise_samples = 4 * n_classes
         for w_i, w in enumerate(ws_test):
             x_gen, x_gen_store = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_eval_samples)
             grid = make_grid(x_gen*-1 + 1, nrow=n_classes)
-            save_image(grid, save_dir + f"image_ep{ep}_w{w}.png")
-            print('saved image at ' + save_dir + f"image_ep{ep}_w{w}.png")
+            save_image(grid, save_dir + save_name)
+            print('saved image at ' + save_dir + save_name)
 
             if save_gif:
                 fig, axs = plt.subplots(nrows=int(n_noise_samples/n_classes), ncols=n_classes,sharex=True,sharey=True,figsize=(8,3))

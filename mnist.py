@@ -1,6 +1,6 @@
 import torch
 from torch.utils import data
-from torchvision.datasets import MNIST
+from torchvision.datasets import MNIST, FashionMNIST
 
 
 class TensorDataset(data.Dataset):
@@ -27,8 +27,21 @@ def get_MNIST():
     return train_dataset
 
 
-def get_split_MNIST():
-    train_dataset = get_MNIST()
+def get_FashionMNIST():
+    train_dataset = FashionMNIST(
+        root="data",
+        train=True,
+        download=True,
+        transform=lambda x: x
+    )
+
+    train_dataset = TensorDataset(train_dataset.data.unsqueeze(1) / 255, train_dataset.targets)
+
+    return train_dataset
+
+
+def get_split_MNIST(fashion=False):
+    train_dataset = get_FashionMNIST() if fashion else get_MNIST()
 
     train_data = []
 
@@ -39,3 +52,20 @@ def get_split_MNIST():
         train_data.append(train_subset)
 
     return train_data
+
+
+def get_random_coreset(dataset, coreset_size):
+    data, targets = dataset.data, dataset.targets
+    n_data = len(data)
+    coreset_indices = torch.randperm(n_data)[:coreset_size]
+    coreset = TensorDataset(data[coreset_indices], targets[coreset_indices])
+    train_data = TensorDataset(data[~coreset_indices], targets[~coreset_indices])
+
+    return train_data, coreset
+
+
+def merge_datasets(datasets):
+    data = torch.cat([dataset.data for dataset in datasets])
+    targets = torch.cat([dataset.targets for dataset in datasets])
+
+    return TensorDataset(data, targets)
