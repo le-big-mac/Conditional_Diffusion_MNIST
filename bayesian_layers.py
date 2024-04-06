@@ -6,13 +6,14 @@ import torch.nn.functional as F
 
 
 class Linear(nn.Module):
-    def __init__(self, in_features, out_features, bias=True, mle=False):
+    def __init__(self, in_features, out_features, bias=True, mle=False, logvar_init=-8.0):
         super().__init__()
         self.mle = mle
         self.in_features = in_features
         self.out_features = out_features
         self.weight_mean = nn.Parameter(torch.Tensor(out_features, in_features))
         self.weight_logvar = nn.Parameter(torch.Tensor(out_features, in_features))
+        self.logvar_init = logvar_init
         if bias:
             self.bias_mean = nn.Parameter(torch.Tensor(out_features))
             self.bias_logvar = nn.Parameter(torch.Tensor(out_features))
@@ -23,10 +24,10 @@ class Linear(nn.Module):
 
     def reset_parameters(self):
         nn.init.kaiming_uniform_(self.weight_mean, a=math.sqrt(5))
-        nn.init.constant_(self.weight_logvar, -10.)
+        nn.init.constant_(self.weight_logvar, self.logvar_init)
         if self.bias_mean is not None:
             nn.init.zeros_(self.bias_mean)
-            nn.init.constant_(self.bias_logvar, -10.)
+            nn.init.constant_(self.bias_logvar, self.logvar_init)
 
     def forward(self, x, num_param_samples=10):
         if self.mle:
@@ -51,7 +52,7 @@ class Linear(nn.Module):
 
 
 class Conv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, mle=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, mle=False, logvar_init=-8.0):
         super().__init__()
         self.mle = mle
         self.in_channels = in_channels
@@ -61,6 +62,7 @@ class Conv2d(nn.Module):
         self.padding = padding
         self.weight_mean = nn.Parameter(torch.Tensor(out_channels, in_channels, kernel_size, kernel_size))
         self.weight_logvar = nn.Parameter(torch.Tensor(out_channels, in_channels, kernel_size, kernel_size))
+        self.logvar_init = logvar_init
         if bias:
             self.bias_mean = nn.Parameter(torch.Tensor(out_channels))
             self.bias_logvar = nn.Parameter(torch.Tensor(out_channels))
@@ -71,10 +73,10 @@ class Conv2d(nn.Module):
 
     def reset_parameters(self):
         nn.init.kaiming_uniform_(self.weight_mean, a=math.sqrt(5))
-        nn.init.constant_(self.weight_logvar, -10.)
+        nn.init.constant_(self.weight_logvar, self.logvar_init)
         if self.bias_mean is not None:
             nn.init.zeros_(self.bias_mean)
-            nn.init.constant_(self.bias_logvar, -10.)
+            nn.init.constant_(self.bias_logvar, self.logvar_init)
 
     def forward(self, x, num_param_samples=10):
         if self.mle:
@@ -97,7 +99,7 @@ class Conv2d(nn.Module):
 
 
 class ConvTranspose2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, mle=False):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, bias=True, mle=False, logvar_init=-8.0):
         super().__init__()
         self.mle = mle
         self.in_channels = in_channels
@@ -107,6 +109,7 @@ class ConvTranspose2d(nn.Module):
         self.padding = padding
         self.weight_mean = nn.Parameter(torch.Tensor(in_channels, out_channels, kernel_size, kernel_size))
         self.weight_logvar = nn.Parameter(torch.Tensor(in_channels, out_channels, kernel_size, kernel_size))
+        self.logvar_init = logvar_init
         if bias:
             self.bias_mean = nn.Parameter(torch.Tensor(out_channels))
             self.bias_logvar = nn.Parameter(torch.Tensor(out_channels))
@@ -117,10 +120,10 @@ class ConvTranspose2d(nn.Module):
 
     def reset_parameters(self):
         nn.init.kaiming_uniform_(self.weight_mean, a=math.sqrt(5))
-        nn.init.constant_(self.weight_logvar, -10.)
+        nn.init.constant_(self.weight_logvar, self.logvar_init)
         if self.bias_mean is not None:
             nn.init.zeros_(self.bias_mean)
-            nn.init.constant_(self.bias_logvar, -10.)
+            nn.init.constant_(self.bias_logvar, self.logvar_init)
 
     def forward(self, x, num_param_samples=10):
         if self.mle:
@@ -143,7 +146,7 @@ class ConvTranspose2d(nn.Module):
 
 
 class BatchNorm2d(nn.Module):
-    def __init__(self, num_features, mle=False):
+    def __init__(self, num_features, mle=False, logvar_init=-8.0):
         super().__init__()
         self.mle = mle
         self.num_features = num_features
@@ -151,6 +154,7 @@ class BatchNorm2d(nn.Module):
         self.weight_logvar = nn.Parameter(torch.Tensor(num_features))
         self.bias_mean = nn.Parameter(torch.Tensor(num_features))
         self.bias_logvar = nn.Parameter(torch.Tensor(num_features))
+        self.logvar_init = logvar_init
         self.reset_parameters()
 
         self.register_buffer('running_mean', torch.zeros(num_features))
@@ -161,9 +165,9 @@ class BatchNorm2d(nn.Module):
 
     def reset_parameters(self):
         nn.init.ones_(self.weight_mean)
-        nn.init.constant_(self.weight_logvar, -10.)
+        nn.init.constant_(self.weight_logvar, self.logvar_init)
         nn.init.zeros_(self.bias_mean)
-        nn.init.constant_(self.bias_logvar, -10.)
+        nn.init.constant_(self.bias_logvar, self.logvar_init)
 
     def forward(self, x, num_param_samples=10):
         if self.training:

@@ -23,7 +23,7 @@ import bayesian_layers as bl
 
 class ResidualConvBlock(nn.Module):
     def __init__(
-        self, in_channels: int, out_channels: int, is_res: bool = False, mle: bool = False
+        self, in_channels: int, out_channels: int, is_res: bool = False, mle: bool = False, logvar_init: float = -8.0
     ) -> None:
         super().__init__()
         '''
@@ -31,14 +31,14 @@ class ResidualConvBlock(nn.Module):
         '''
         self.same_channels = in_channels==out_channels
         self.is_res = is_res
-        self.conv1 = bl.Conv2d(in_channels, out_channels, 3, 1, 1, mle=mle)
+        self.conv1 = bl.Conv2d(in_channels, out_channels, 3, 1, 1, mle=mle, logvar_init=logvar_init)
         self.after_conv1 = nn.Sequential(
-            bl.BatchNorm2d(out_channels),
+            nn.BatchNorm2d(out_channels),
             nn.GELU(),
         )
-        self.conv2 = bl.Conv2d(out_channels, out_channels, 3, 1, 1, mle=mle)
+        self.conv2 = bl.Conv2d(out_channels, out_channels, 3, 1, 1, mle=mle, logvar_init=logvar_init)
         self.after_conv2 = nn.Sequential(
-            bl.BatchNorm2d(out_channels),
+            nn.BatchNorm2d(out_channels),
             nn.GELU(),
         )
 
@@ -63,12 +63,12 @@ class ResidualConvBlock(nn.Module):
 
 
 class UnetDown(nn.Module):
-    def __init__(self, in_channels, out_channels, mle=False):
+    def __init__(self, in_channels, out_channels, mle=False, logvar_init=-8.0):
         super(UnetDown, self).__init__()
         '''
         process and downscale the image feature maps
         '''
-        self.res = ResidualConvBlock(in_channels, out_channels, mle=mle)
+        self.res = ResidualConvBlock(in_channels, out_channels, mle=mle, logvar_init=logvar_init)
         self.maxpool = nn.MaxPool2d(2)
 
     def forward(self, x, num_param_samples=10):
@@ -77,14 +77,14 @@ class UnetDown(nn.Module):
 
 
 class UnetUp(nn.Module):
-    def __init__(self, in_channels, out_channels, mle=False):
+    def __init__(self, in_channels, out_channels, mle=False, logvar_init=-8.0):
         super(UnetUp, self).__init__()
         '''
         process and upscale the image feature maps
         '''
-        self.ct = bl.ConvTranspose2d(in_channels, out_channels, 2, 2, mle=mle)
-        self.r1 = ResidualConvBlock(out_channels, out_channels, mle=mle)
-        self.r2 = ResidualConvBlock(out_channels, out_channels, mle=mle)
+        self.ct = bl.ConvTranspose2d(in_channels, out_channels, 2, 2, mle=mle, logvar_init=logvar_init)
+        self.r1 = ResidualConvBlock(out_channels, out_channels, mle=mle, logvar_init=logvar_init)
+        self.r2 = ResidualConvBlock(out_channels, out_channels, mle=mle, logvar_init=logvar_init)
 
     def forward(self, x, skip, num_param_samples=10):
         x = torch.cat((x, skip), 1)
@@ -94,14 +94,14 @@ class UnetUp(nn.Module):
 
 
 class EmbedFC(nn.Module):
-    def __init__(self, input_dim, emb_dim, mle=False):
+    def __init__(self, input_dim, emb_dim, mle=False, logvar_init=-8.0):
         super(EmbedFC, self).__init__()
         '''
         generic one layer FC NN for embedding things
         '''
         self.input_dim = input_dim
-        self.l1 = bl.Linear(input_dim, emb_dim, mle=mle)
-        self.l2 = bl.Linear(emb_dim, emb_dim, mle=mle)
+        self.l1 = bl.Linear(input_dim, emb_dim, mle=mle, logvar_init=logvar_init)
+        self.l2 = bl.Linear(emb_dim, emb_dim, mle=mle, logvar_init=logvar_init)
 
     def forward(self, x, num_param_samples=10):
         x = x.view(-1, self.input_dim)
@@ -126,7 +126,7 @@ class EmbedFC_deterministic(nn.Module):
 
 
 class ContextUnet(nn.Module):
-    def __init__(self, in_channels, n_feat = 256, n_classes=10, mle=False, deterministic_embed=False):
+    def __init__(self, in_channels, n_feat = 256, n_classes=10, mle=False, deterministic_embed=False, logvar_init=-8.0):
         super(ContextUnet, self).__init__()
 
         self.in_channels = in_channels
@@ -135,15 +135,15 @@ class ContextUnet(nn.Module):
         self.mle = mle
         self.deterministic_embed = deterministic_embed
 
-        self.init_conv = ResidualConvBlock(in_channels, n_feat, is_res=True, mle=mle)
+        self.init_conv = ResidualConvBlock(in_channels, n_feat, is_res=True, mle=mle, logvar_init=logvar_init)
 
-        self.down1 = UnetDown(n_feat, n_feat, mle=mle)
-        self.down2 = UnetDown(n_feat, 2 * n_feat, mle=mle)
+        self.down1 = UnetDown(n_feat, n_feat, mle=mle, logvar_init=logvar_init)
+        self.down2 = UnetDown(n_feat, 2 * n_feat, mle=mle, logvar_init=logvar_init)
 
         self.to_vec = nn.Sequential(nn.AvgPool2d(7), nn.GELU())
 
-        self.timeembed1 = EmbedFC(1, 2*n_feat, mle=mle)
-        self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle)
+        self.timeembed1 = EmbedFC(1, 2*n_feat, mle=mle, logvar_init=logvar_init)
+        self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle, logvar_init=logvar_init)
 
         if self.deterministic_embed:
             self.contextembed1 = nn.ModuleList([EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)])
@@ -153,29 +153,29 @@ class ContextUnet(nn.Module):
             self.c1_det_logvar = nn.Parameter(torch.randn(1, 2*n_feat))
             self.c2_det_logvar = nn.Parameter(torch.randn(1, 1*n_feat))
         else:
-            self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle)
-            self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle)
+            self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle, logvar_init=logvar_init)
+            self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle, logvar_init=logvar_init)
 
         # self.timeembed1 = EmbedFC_deterministic(1, 2*n_feat)
         # self.timeembed2 = EmbedFC_deterministic(1, 1*n_feat)
         # self.contextembed1 = EmbedFC_deterministic(n_classes, 2*n_feat)
         # self.contextembed2 = EmbedFC_deterministic(n_classes, 1*n_feat)
 
-        self.up0_ct = bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=mle)
+        self.up0_ct = bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=mle, logvar_init=logvar_init)
         self.up0 = nn.Sequential(
             # nn.ConvTranspose2d(6 * n_feat, 2 * n_feat, 7, 7), # when concat temb and cemb end up w 6*n_feat
             nn.GroupNorm(8, 2 * n_feat),
             nn.ReLU(),
         )
 
-        self.up1 = UnetUp(4 * n_feat, n_feat, mle=mle)
-        self.up2 = UnetUp(2 * n_feat, n_feat, mle=mle)
-        self.out_conv1 = bl.Conv2d(2 * n_feat, n_feat, 3, 1, 1, mle=mle)
+        self.up1 = UnetUp(4 * n_feat, n_feat, mle=mle, logvar_init=logvar_init)
+        self.up2 = UnetUp(2 * n_feat, n_feat, mle=mle, logvar_init=logvar_init)
+        self.out_conv1 = bl.Conv2d(2 * n_feat, n_feat, 3, 1, 1, mle=mle, logvar_init=logvar_init)
         self.out = nn.Sequential(
             nn.GroupNorm(8, n_feat),
             nn.ReLU(),
         )
-        self.out_conv2 = bl.Conv2d(n_feat, self.in_channels, 3, 1, 1, mle=mle)
+        self.out_conv2 = bl.Conv2d(n_feat, self.in_channels, 3, 1, 1, mle=mle, logvar_init=logvar_init)
 
     def forward(self, x, c, t, context_mask, num_param_samples=10):
         # x is (noisy) image, c is context label, t is timestep,
