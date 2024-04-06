@@ -34,7 +34,7 @@ n_T = 400 # 500
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 n_classes = 10
 n_feat = 128 # 128 ok, 256 better (but slower)
-save_model = False
+save_model = True
 num_param_samples = 1 if mle_comp else 10
 
 os.makedirs(save_dir, exist_ok=True)
@@ -82,6 +82,10 @@ for digit in range(n_classes):
         if ep % 20 == 0 or ep == n_epoch - 1:
             save_gif = False
             eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
+
+    if save_model:
+        torch.save(ddpm.cpu().state_dict(), save_dir + f"model_{digit}.pth")
+        print('saved model at ' + save_dir + f"model_{digit}.pth")
 
     prior_mu, prior_logvar = stack_params(nn_model)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
