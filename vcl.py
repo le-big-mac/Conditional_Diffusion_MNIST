@@ -84,8 +84,8 @@ for digit in range(n_classes):
             eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
 
     if save_model:
-        torch.save(ddpm.cpu().state_dict(), save_dir + f"model_{digit}.pth")
-        print('saved model at ' + save_dir + f"model_{digit}.pth")
+        torch.save({k : v.cpu() for k, v in ddpm.state_dict().items()}, save_dir + f"/model_{digit}.pth")
+        print('saved model at ' + save_dir + f"/model_{digit}.pth")
 
     prior_mu, prior_logvar = stack_params(nn_model)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
