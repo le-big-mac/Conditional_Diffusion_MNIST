@@ -155,6 +155,10 @@ class ContextUnet(nn.Module):
             self.c2_det_mean = nn.Parameter(torch.Tensor(1, 1*n_feat))
             self.c1_det_logvar = nn.Parameter(torch.Tensor(1, 2*n_feat))
             self.c2_det_logvar = nn.Parameter(torch.Tensor(1, 1*n_feat))
+            for t in self.contextembed1:
+                nn.init.kaiming_uniform_(t, a=math.sqrt(5))
+            for t in self.contextembed2:
+                nn.init.kaiming_uniform_(t, a=math.sqrt(5))
             nn.init.kaiming_uniform_(self.c1_det_mean, a=math.sqrt(5))
             nn.init.constant_(self.c1_det_logvar, logvar_init)
             nn.init.kaiming_uniform_(self.c2_det_mean, a=math.sqrt(5))
