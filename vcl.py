@@ -17,6 +17,7 @@ parser.add_argument('--lrate', type=float, default=1e-4, help='learning rate')
 parser.add_argument('--num_eval_samples', type=int, default=50, help='number of evaluation samples')
 parser.add_argument('--deterministic_embed', action='store_true', help='whether to use deterministic embeddings')
 parser.add_argument('--logvar_init', type=float, default=-10.0, help='initial logvar value')
+parser.add_argument('--log_freq', type=int, default=20, help='logging frequency')
 
 args = parser.parse_args()
 print(args)
@@ -29,6 +30,7 @@ lrate = args.lrate
 num_eval_samples = args.num_eval_samples
 deterministic_embed = args.deterministic_embed
 logvar_init = args.logvar_init
+log_freq = args.log_freq
 batch_size = 256
 n_T = 400 # 500
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -79,7 +81,7 @@ for digit in range(n_classes):
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
-        if ep % 20 == 0 or ep == n_epoch - 1:
+        if ep % log_freq == 0 or ep == n_epoch - 1:
             save_gif = False
             eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
 
