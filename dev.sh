@@ -13,4 +13,4 @@ module load CUDA/11.8.0
 
 source activate $DATA/agd
 
-python vcl.py
+python vcl.py "$@"
