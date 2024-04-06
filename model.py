@@ -214,8 +214,8 @@ class ContextUnet(nn.Module):
         else:
             c = c.repeat(num_param_samples)
             # mask out context if context_mask == 1
-            context_mask = context_mask[:, None]
             context_mask = context_mask.repeat(num_param_samples)
+            context_mask = context_mask[:, None]
             # convert context to one hot embedding
             c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
             context_mask = context_mask.repeat(1,self.n_classes)
