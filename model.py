@@ -147,8 +147,10 @@ class ContextUnet(nn.Module):
         self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle, logvar_init=logvar_init)
 
         if self.deterministic_embed:
-            self.contextembed1 = nn.ModuleList([EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)])
-            self.contextembed2 = nn.ModuleList([EmbedFC_deterministic(1, 1*n_feat) for _ in range(n_classes)])
+            # self.contextembed1 = nn.ModuleList([EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)])
+            # self.contextembed2 = nn.ModuleList([EmbedFC_deterministic(1, 1*n_feat) for _ in range(n_classes)])
+            self.contextembed1 = nn.ParameterList([nn.Parameter(torch.Tensor(1, 2*n_feat)) for _ in range(n_classes)])
+            self.contextembed2 = nn.ParameterList([nn.Parameter(torch.Tensor(1, 1*n_feat)) for _ in range(n_classes)])
             self.c1_det_mean = nn.Parameter(torch.Tensor(1, 2*n_feat))
             self.c2_det_mean = nn.Parameter(torch.Tensor(1, 1*n_feat))
             self.c1_det_logvar = nn.Parameter(torch.Tensor(1, 2*n_feat))
@@ -195,20 +197,19 @@ class ContextUnet(nn.Module):
         hiddenvec = self.to_vec(down2)
 
         if self.deterministic_embed:
-            one_input = torch.ones((1,1)).type(torch.float).to(c.device)
             c = c + (context_mask) * 10
             class_indices = [torch.where(c==i)[0] for i in range(self.n_classes)]
             mask_indices = torch.where(context_mask==1)[0]
 
-            def context_embed(embed_fns, det_mean, det_logvar, out_shape):
+            def context_embed(embed_vecs, det_mean, det_logvar, out_shape):
                 cemb = torch.empty((c.shape[0], out_shape), dtype=torch.float).to(c.device)
                 for i in range(self.n_classes):
-                    cemb[class_indices[i]] = embed_fns[i](one_input)
-                cemb = cemb.repeat(num_param_samples, 1, 1)
-                for i in range(num_param_samples):
-                    if self.mle:
-                        cemb[i][mask_indices] = det_mean
-                    else:
+                    cemb[class_indices[i]] = embed_vecs[i]
+                if self.mle:
+                    cemb[mask_indices] = det_mean
+                    cemb = cemb.repeat(num_param_samples, 1, 1)
+                else:
+                    for i in range(num_param_samples):
                         cemb[i][mask_indices] = det_mean + torch.randn_like(det_mean) * torch.exp(0.5 * det_logvar)
 
                 return cemb.reshape(-1, out_shape, 1, 1)
