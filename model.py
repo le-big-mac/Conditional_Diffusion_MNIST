@@ -14,6 +14,7 @@ This technique also features in ImageGen 'Photorealistic Text-to-Image Diffusion
 https://arxiv.org/abs/2205.11487
 
 '''
+import math
 
 import torch
 import torch.nn as nn
@@ -148,10 +149,14 @@ class ContextUnet(nn.Module):
         if self.deterministic_embed:
             self.contextembed1 = nn.ModuleList([EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)])
             self.contextembed2 = nn.ModuleList([EmbedFC_deterministic(1, 1*n_feat) for _ in range(n_classes)])
-            self.c1_det_mean = nn.Parameter(torch.randn(1, 2*n_feat))
-            self.c2_det_mean = nn.Parameter(torch.randn(1, 1*n_feat))
-            self.c1_det_logvar = nn.Parameter(torch.randn(1, 2*n_feat))
-            self.c2_det_logvar = nn.Parameter(torch.randn(1, 1*n_feat))
+            self.c1_det_mean = nn.Parameter(torch.Tensor(1, 2*n_feat))
+            self.c2_det_mean = nn.Parameter(torch.Tensor(1, 1*n_feat))
+            self.c1_det_logvar = nn.Parameter(torch.Tensor(1, 2*n_feat))
+            self.c2_det_logvar = nn.Parameter(torch.Tensor(1, 1*n_feat))
+            nn.init.kaiming_uniform_(self.c1_det_mean, a=math.sqrt(5))
+            nn.init.constant_(self.c1_det_logvar, logvar_init)
+            nn.init.kaiming_uniform_(self.c2_det_mean, a=math.sqrt(5))
+            nn.init.constant_(self.c2_det_logvar, logvar_init)
         else:
             self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle, logvar_init=logvar_init)
             self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle, logvar_init=logvar_init)
