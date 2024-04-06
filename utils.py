@@ -59,7 +59,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
     return x, c
 
 
-def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 1.0, 2.0, 3.0], save_gif=False, num_eval_samples=10, save_name=None):
+def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 2.0, 5.0], save_gif=False, num_eval_samples=10, save_name=None):
     ddpm.eval()
     if save_name is None:
         save_name = f"image_ep{ep}_w{{w}}.png"
