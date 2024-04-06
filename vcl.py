@@ -16,7 +16,7 @@ parser.add_argument('--gamma', type=float, default=1.0, help='batch size')
 parser.add_argument('--lrate', type=float, default=1e-4, help='learning rate')
 parser.add_argument('--num_eval_samples', type=int, default=50, help='number of evaluation samples')
 parser.add_argument('--deterministic_embed', action='store_true', help='whether to use deterministic embeddings')
-parser.add_argument('--logvar_init', type=float, default=-8.0, help='initial logvar value')
+parser.add_argument('--logvar_init', type=float, default=-10.0, help='initial logvar value')
 
 args = parser.parse_args()
 print(args)
