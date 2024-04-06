@@ -18,6 +18,7 @@ parser.add_argument('--num_eval_samples', type=int, default=50, help='number of 
 parser.add_argument('--deterministic_embed', action='store_true', help='whether to use deterministic embeddings')
 parser.add_argument('--logvar_init', type=float, default=-10.0, help='initial logvar value')
 parser.add_argument('--log_freq', type=int, default=20, help='logging frequency')
+parser.add_argument('--batch_size', type=int, default=256, help='batch size')
 
 args = parser.parse_args()
 print(args)
@@ -31,7 +32,7 @@ num_eval_samples = args.num_eval_samples
 deterministic_embed = args.deterministic_embed
 logvar_init = args.logvar_init
 log_freq = args.log_freq
-batch_size = 256
+batch_size = args.batch_size
 n_T = 400 # 500
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 n_classes = 10
