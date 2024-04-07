@@ -1,10 +1,9 @@
-import os
 import pickle
 
 import torch
 from torch.utils import data
 
-from mnist import get_split_MNIST, get_random_coreset
+from mnist import get_split_MNIST
 from utils import eval, model_setup, stack_params, train_epoch
 import argparse
 
@@ -21,6 +20,7 @@ parser.add_argument('--log_freq', type=int, default=20, help='logging frequency'
 parser.add_argument('--batch_size', type=int, default=256, help='batch size')
 parser.add_argument('--coreset_size', type=int, default=0, help='size of coreset')
 parser.add_argument('--fashion', action='store_true', help='use FashionMNIST instead of MNIST' )
+parser.add_argument('--restart_epoch', type=int, default=0, help='epoch to restart training from')
 
 args = parser.parse_args()
 print(args)
@@ -51,47 +51,26 @@ hparams = {
 
 coreset_size = args.coreset_size
 fashion = args.fashion
-
-os.makedirs(save_dir, exist_ok=True)
-
-for i in range(n_classes):
-    os.makedirs(f"{save_dir}/{i}", exist_ok=True)
-os.makedirs(f"{save_dir}/mle/", exist_ok=True)
+restart_epoch = args.restart_epoch
 
 digit_datasets = get_split_MNIST(fashion=fashion)
 if coreset_size > 0:
-    digit_datasets, coresets = zip(*[(get_random_coreset(digit_data, coreset_size)) for digit_data in digit_datasets])
     with open(f"{save_dir}/data_and_coresets.pkl", "wb+") as f:
-        pickle.dump((digit_datasets, coresets), f)
+        digit_datasets, coresets = pickle.load(f)
 
-if not mle_comp:
-    # MLE pretraining for VCL
-    ddpm = model_setup(hparams, mle=True, n_T=n_T, device=device)
-    zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
-    optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
-    for ep in range(20):
-        print(f"Epoch {ep}")
-        optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        train_epoch(ddpm, zero_loader, optim, device, num_param_samples=1)
-    eval(19, ddpm, 1, f"{save_dir}/mle/", device, num_eval_samples=1)
-    prior_mu, prior_logvar = stack_params(ddpm)
-    prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
-    ddpm.cpu()
-    prev_params = ddpm.state_dict()
-else:
-    prior_mu, prior_logvar = None, None
 
-if device == "cuda:0":
-    torch.cuda.empty_cache()
-
+prev_params = torch.load(f"{save_dir}/{restart_epoch}/model.pth")
 # No need to reinitialize model each class if we are not using coresets
 ddpm = model_setup(hparams, mle=mle_comp, n_T=n_T, device=device)
-if not mle_comp:
-    ddpm.load_state_dict(prev_params)
+ddpm.load_state_dict(prev_params)
 ddpm.to(device)
+if not mle_comp:
+    prior_mu, prior_logvar = stack_params(ddpm)
+else:
+    prior_mu, prior_logvar = None, None
 optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 
-for digit in range(n_classes):
+for digit in range(restart_epoch+1, n_classes):
     digit_data = digit_datasets[digit]
     digit_loader = data.DataLoader(digit_data, batch_size=batch_size, shuffle=True, num_workers=0)
 
