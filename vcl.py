@@ -74,7 +74,7 @@ if not mle_comp:
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         train_epoch(ddpm, zero_loader, optim, device, num_param_samples=1)
-    eval(19, ddpm, 1, f"{save_dir}/mle/", device, num_eval_samples=1)
+    eval(19, ddpm, 1, f"{save_dir}/mle", device, num_eval_samples=1)
     prior_mu, prior_logvar = stack_params(ddpm)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
     ddpm.cpu()
@@ -109,7 +109,7 @@ for digit in range(n_classes):
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         if ep % log_freq == 0 or ep == n_epoch - 1:
             save_gif = False
-            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}", device, save_gif=save_gif, num_eval_samples=num_eval_samples)
 
     # Extract prior for next class
     prior_mu, prior_logvar = stack_params(ddpm)
@@ -134,7 +134,7 @@ for digit in range(n_classes):
                 print(f"Epoch {ep}")
                 optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
                 train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
-            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples, save_name=f"coreset_{i}")
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}", device, save_gif=save_gif, num_eval_samples=num_eval_samples, save_name=f"coreset_{i}")
 
     if device == "cuda:0":
         torch.cuda.empty_cache()
