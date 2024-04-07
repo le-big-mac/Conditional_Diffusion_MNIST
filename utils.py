@@ -45,6 +45,7 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
             loss += kl
             kl = kl.item()
         loss.backward()
+        optim.step()
 
         if loss_ema is None:
             loss_ema = loss.item()
@@ -54,37 +55,35 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
             pbar.set_description(f"loss: {loss_ema:.4f}")
         else:
             pbar.set_description(f"loss: {loss_ema:.4f} kl: {kl:.4f} mle: {mle_val:.4f}")
-        optim.step()
-
-    return x, c
 
 
+@torch.no_grad()
 def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 2.0, 5.0], save_gif=False, num_eval_samples=10, save_name=None):
     ddpm.eval()
     if save_name is None:
         save_name = f"image_ep{ep}_w{{w}}.png"
 
-    with torch.no_grad():
-        n_noise_samples = 4 * n_classes
-        for w_i, w in enumerate(ws_test):
-            x_gen, x_gen_store = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_eval_samples)
-            grid = make_grid(x_gen*-1 + 1, nrow=n_classes)
-            save_image(grid, save_dir + save_name)
-            print('saved image at ' + save_dir + save_name)
+    n_noise_samples = 4 * n_classes
+    for w_i, w in enumerate(ws_test):
+        x_gen, x_gen_store = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_eval_samples)
+        x_gen, x_gen_store = x_gen.cpu(), x_gen_store.cpu()
+        grid = make_grid(x_gen*-1 + 1, nrow=n_classes)
+        save_image(grid, save_dir + save_name)
+        print('saved image at ' + save_dir + save_name)
 
-            if save_gif:
-                fig, axs = plt.subplots(nrows=int(n_noise_samples/n_classes), ncols=n_classes,sharex=True,sharey=True,figsize=(8,3))
-                def animate_diff(i, x_gen_store):
-                    print(f'gif animating frame {i} of {x_gen_store.shape[0]}', end='\r')
-                    plots = []
-                    for row in range(int(n_noise_samples/n_classes)):
-                        for col in range(n_classes):
-                            axs[row, col].clear()
-                            axs[row, col].set_xticks([])
-                            axs[row, col].set_yticks([])
-                            # plots.append(axs[row, col].imshow(x_gen_store[i,(row*n_classes)+col,0],cmap='gray'))
-                            plots.append(axs[row, col].imshow(-x_gen_store[i,(row*n_classes)+col,0],cmap='gray',vmin=(-x_gen_store[i]).min(), vmax=(-x_gen_store[i]).max()))
-                    return plots
-                ani = FuncAnimation(fig, animate_diff, fargs=[x_gen_store],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0])
-                ani.save(save_dir + f"gif_ep{ep}_w{w}.gif", dpi=100, writer=PillowWriter(fps=5))
-                print('saved image at ' + save_dir + f"gif_ep{ep}_w{w}.gif")
+        # if save_gif:
+        #     fig, axs = plt.subplots(nrows=int(n_noise_samples/n_classes), ncols=n_classes,sharex=True,sharey=True,figsize=(8,3))
+        #     def animate_diff(i, x_gen_store):
+        #         print(f'gif animating frame {i} of {x_gen_store.shape[0]}', end='\r')
+        #         plots = []
+        #         for row in range(int(n_noise_samples/n_classes)):
+        #             for col in range(n_classes):
+        #                 axs[row, col].clear()
+        #                 axs[row, col].set_xticks([])
+        #                 axs[row, col].set_yticks([])
+        #                 # plots.append(axs[row, col].imshow(x_gen_store[i,(row*n_classes)+col,0],cmap='gray'))
+        #                 plots.append(axs[row, col].imshow(-x_gen_store[i,(row*n_classes)+col,0],cmap='gray',vmin=(-x_gen_store[i]).min(), vmax=(-x_gen_store[i]).max()))
+        #         return plots
+        #     ani = FuncAnimation(fig, animate_diff, fargs=[x_gen_store],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0])
+        #     ani.save(save_dir + f"gif_ep{ep}_w{w}.gif", dpi=100, writer=PillowWriter(fps=5))
+        #     print('saved image at ' + save_dir + f"gif_ep{ep}_w{w}.gif")

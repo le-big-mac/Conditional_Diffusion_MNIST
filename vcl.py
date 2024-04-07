@@ -60,27 +60,29 @@ if coreset_size > 0:
 
 if not mle_comp:
     # MLE pretraining for VCL
-    nn_model = ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
-    ddpm_mle = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-    ddpm_mle.to(device)
+    ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embed=deterministic_embed, logvar_init=logvar_init),
+                betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+    ddpm.to(device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
-    optim = torch.optim.Adam(ddpm_mle.parameters(), lr=lrate)
+    optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
     for ep in range(20):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        train_epoch(ddpm_mle, zero_loader, optim, device, num_param_samples=1)
-    eval(19, ddpm_mle, 1, f"{save_dir}/mle/", device, num_eval_samples=1)
-    prior_mu, prior_logvar = stack_params(nn_model)
+        train_epoch(ddpm, zero_loader, optim, device, num_param_samples=1)
+    eval(19, ddpm, 1, f"{save_dir}/mle/", device, num_eval_samples=1)
+    prior_mu, prior_logvar = stack_params(ddpm)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
-    ddpm_mle.cpu()
-    prev_params = ddpm_mle.state_dict()
+    ddpm.cpu()
+    prev_params = ddpm.state_dict()
 else:
     prior_mu, prior_logvar = None, None
 
+torch.cuda.empty_cache()
+
 # No need to reinitialize model each class if we are not using coresets
 if coreset_size == 0:
-    nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
-    ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+    ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init),
+                betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
     if not mle_comp:
         ddpm.load_state_dict(prev_params)
     ddpm.to(device)
@@ -92,9 +94,9 @@ for digit in range(n_classes):
 
     # Reinitialize with previous parameters if we are using coresets
     if coreset_size > 0:
-        nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
-        ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-        if not mle_comp or digit > 0:
+        ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed,
+                                logvar_init=logvar_init), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+        if digit > 0 or not mle_comp:
             ddpm.load_state_dict(prev_params)
         ddpm.to(device)
         optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
@@ -103,7 +105,7 @@ for digit in range(n_classes):
     for ep in range(n_epoch):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        x, c = train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
+        train_epoch(ddpm, digit_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
         # save_gif = True if ep == n_epoch - 1 or ep%5 == 0 else False
         if ep % log_freq == 0 or ep == n_epoch - 1:
             save_gif = False
@@ -122,10 +124,11 @@ for digit in range(n_classes):
 
     # Train and evaluate on coreset data
     if coreset_size > 0:
-        prev_params = {k : v.cpu() for k, v in ddpm.state_dict().items()}
+        ddpm.cpu()
+        prev_params = ddpm.state_dict()
         for i in range(digit + 1):
-            nn_model = ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init)
-            ddpm = DDPM(nn_model, betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+            ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed,
+                                    logvar_init=logvar_init), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
             ddpm.load_state_dict(prev_params)
             ddpm.to(device)
             optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
@@ -133,6 +136,7 @@ for digit in range(n_classes):
             for ep in range(n_epoch):
                 print(f"Epoch {ep}")
                 optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-                x, c = train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
+                train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
             eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples, save_name=f"coreset_{i}")
 
+    torch.cuda.empty_cache()
