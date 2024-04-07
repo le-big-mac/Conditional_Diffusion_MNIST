@@ -77,7 +77,8 @@ if not mle_comp:
 else:
     prior_mu, prior_logvar = None, None
 
-torch.cuda.empty_cache()
+if device == "cuda:0":
+    torch.cuda.empty_cache()
 
 # No need to reinitialize model each class if we are not using coresets
 if coreset_size == 0:
@@ -139,4 +140,5 @@ for digit in range(n_classes):
                 train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
             eval(ep, ddpm, digit+1, f"{save_dir}/{digit}/", device, save_gif=save_gif, num_eval_samples=num_eval_samples, save_name=f"coreset_{i}")
 
-    torch.cuda.empty_cache()
+    if device == "cuda:0":
+        torch.cuda.empty_cache()
