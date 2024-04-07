@@ -5,8 +5,7 @@ import torch
 from torch.utils import data
 
 from mnist import get_split_MNIST, get_random_coreset
-from model import ContextUnet, DDPM
-from utils import eval, stack_params, train_epoch
+from utils import eval, model_setup, stack_params, train_epoch
 import argparse
 
 parser = argparse.ArgumentParser(description='Conditional Diffusion MNIST')
@@ -43,6 +42,13 @@ n_feat = 128 # 128 ok, 256 better (but slower)
 save_model = True
 num_param_samples = 1 if mle_comp else 10
 
+hparams = {
+    "n_feat": n_feat,
+    "n_classes": n_classes,
+    "deterministic_embed": deterministic_embed,
+    "logvar_init": logvar_init
+}
+
 coreset_size = args.coreset_size
 fashion = args.fashion
 
@@ -60,9 +66,7 @@ if coreset_size > 0:
 
 if not mle_comp:
     # MLE pretraining for VCL
-    ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=True, deterministic_embed=deterministic_embed, logvar_init=logvar_init),
-                betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-    ddpm.to(device)
+    ddpm = model_setup(hparams, mle=True, n_T=n_T, device=device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
     optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
     for ep in range(20):
@@ -81,25 +85,19 @@ if device == "cuda:0":
     torch.cuda.empty_cache()
 
 # No need to reinitialize model each class if we are not using coresets
-if coreset_size == 0:
-    ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed, logvar_init=logvar_init),
-                betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-    if not mle_comp:
-        ddpm.load_state_dict(prev_params)
-    ddpm.to(device)
-    optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+ddpm = model_setup(hparams, mle=mle_comp, n_T=n_T, device=device)
+if not mle_comp:
+    ddpm.load_state_dict(prev_params)
+ddpm.to(device)
+optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 
 for digit in range(n_classes):
     digit_data = digit_datasets[digit]
     digit_loader = data.DataLoader(digit_data, batch_size=batch_size, shuffle=True, num_workers=0)
 
     # Reinitialize with previous parameters if we are using coresets
-    if coreset_size > 0:
-        ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed,
-                                logvar_init=logvar_init), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-        if digit > 0 or not mle_comp:
-            ddpm.load_state_dict(prev_params)
-        ddpm.to(device)
+    if coreset_size > 0 and digit > 0:
+        ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
         optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 
     # Train on non-coreset data
@@ -125,13 +123,10 @@ for digit in range(n_classes):
 
     # Train and evaluate on coreset data
     if coreset_size > 0:
-        ddpm.cpu()
-        prev_params = ddpm.state_dict()
+        # Save pre-coreset parameters
+        prev_params = {k : v.cpu() for k, v in ddpm.state_dict().items()}
         for i in range(digit + 1):
-            ddpm = DDPM(ContextUnet(1, n_feat, n_classes, mle=mle_comp, deterministic_embed=deterministic_embed,
-                                    logvar_init=logvar_init), betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
-            ddpm.load_state_dict(prev_params)
-            ddpm.to(device)
+            ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
             optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
             coreset_loader = data.DataLoader(coresets[i], batch_size=batch_size, shuffle=True, num_workers=0)
             for ep in range(n_epoch):

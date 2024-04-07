@@ -1,9 +1,10 @@
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
+# import matplotlib.pyplot as plt
+# from matplotlib.animation import FuncAnimation, PillowWriter
 import torch
 from torchvision.utils import save_image, make_grid
 from tqdm import tqdm
 
+from model import ContextUnet, DDPM
 
 def stack_params(model):
     mu = []
@@ -26,6 +27,14 @@ def kld(model, prior_mu, prior_logvar):
     mu_diff = (torch.exp(logvar) + (mu - prior_mu)**2) / torch.exp(prior_logvar)
 
     return 0.5 * torch.sum(log_std_diff + mu_diff - 1)
+
+
+def model_setup(hparams, mle, n_T, device):
+    ddpm = DDPM(ContextUnet(1, hparams["n_feat"], hparams["n_classes"],
+                            deterministic_embed=hparams["deterministic_embed"],
+                            logvar_init=hparams["logvar_init"], mle=mle),
+                betas=(1e-4, 0.02), n_T=n_T, device=device, drop_prob=0.1)
+    return ddpm
 
 
 def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=None, prior_logvar=None, gamma=None, mle=True):
