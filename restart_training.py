@@ -1,3 +1,4 @@
+from copy import deepcopy
 import pickle
 
 import torch
@@ -54,9 +55,12 @@ fashion = args.fashion
 restart_digit = args.restart_digit
 
 digit_datasets = get_split_MNIST(fashion=fashion)
-
+if coreset_size > 0:
+    with open(f"{save_dir}/data_and_coresets.pkl", "rb") as f:
+        digit_datasets, coresets = pickle.load(f)
 
 prev_params = torch.load(f"{save_dir}/{restart_digit}/model.pth")
+prev_optim_state = torch.load(f"{save_dir}/{restart_digit}/optim.pth")
 # No need to reinitialize model each class if we are not using coresets
 ddpm = model_setup(hparams, mle=mle_comp, n_T=n_T, device=device)
 ddpm.load_state_dict(prev_params)
@@ -66,10 +70,17 @@ if not mle_comp:
 else:
     prior_mu, prior_logvar = None, None
 optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+optim.load_state_dict(prev_optim_state)
 
 for digit in range(restart_digit+1, n_classes):
     digit_data = digit_datasets[digit]
     digit_loader = data.DataLoader(digit_data, batch_size=batch_size, shuffle=True, num_workers=0)
+
+    # Reinitialize with previous parameters if we are using coresets
+    if coreset_size > 0 and digit > 0:
+        ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
+        optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+        optim.load_state_dict(prev_optim_state)
 
     # Train on non-coreset data
     for ep in range(n_epoch):
@@ -91,3 +102,22 @@ for digit in range(restart_digit+1, n_classes):
         with open(save_dir + f"/{digit}/prior.pkl", "wb+") as f:
             pickle.dump((prior_mu, prior_logvar), f)
         print('saved model at ' + save_dir + f"/model_{digit}.pth")
+
+    # Train and evaluate on coreset data
+    if coreset_size > 0:
+        # Save pre-coreset parameters
+        prev_params = deepcopy({k : v.cpu() for k, v in ddpm.state_dict().items()})
+        prev_optim_state = deepcopy(optim.state_dict())
+        for i in range(digit + 1):
+            ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
+            optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+            optim.load_state_dict(prev_optim_state)
+            coreset_loader = data.DataLoader(coresets[i], batch_size=batch_size, shuffle=True, num_workers=0)
+            for ep in range(n_epoch):
+                print(f"Epoch {ep}")
+                optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
+                train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=mle_comp, num_param_samples=num_param_samples, gamma=gamma)
+            eval(ep, ddpm, digit+1, f"{save_dir}/{digit}", device, save_gif=save_gif, num_eval_samples=num_eval_samples, save_name=f"coreset_{i}")
+
+    if device == "cuda:0":
+        torch.cuda.empty_cache()

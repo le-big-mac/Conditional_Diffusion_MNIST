@@ -42,13 +42,15 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
 
     pbar = tqdm(dataloader)
     loss_ema = None
+    kl_ema = None
+    mse_ema = None
     for x, c in pbar:
         optim.zero_grad()
         x = x.to(device)
         c = c.to(device)
 
         loss = ddpm(x, c, num_param_samples)
-        mle_val = loss.item()
+        mse_val = loss.item()
         if not mle:
             kl = gamma * kld(ddpm, prior_mu, prior_logvar) / len(dataloader.dataset)
             loss += kl
@@ -58,12 +60,18 @@ def train_epoch(ddpm, dataloader, optim, device, num_param_samples=10, prior_mu=
 
         if loss_ema is None:
             loss_ema = loss.item()
+            if not mle:
+                mse_ema = mse_val
+                kl_ema = kl
         else:
             loss_ema = 0.95 * loss_ema + 0.05 * loss.item()
+            if not mle:
+                mse_ema = 0.95 * mse_ema + 0.05 * mse_val
+                kl_ema = 0.95 * kl_ema + 0.05 * kl
         if mle:
             pbar.set_description(f"loss: {loss_ema:.4f}")
         else:
-            pbar.set_description(f"loss: {loss_ema:.4f} kl: {kl:.4f} mle: {mle_val:.4f}")
+            pbar.set_description(f"loss: {loss_ema:.4f} kl: {kl_ema:.4f} mle: {mse_ema:.4f}")
 
 
 @torch.no_grad()
