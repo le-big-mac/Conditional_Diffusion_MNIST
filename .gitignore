@@ -1,6 +1,7 @@
 # My stuff
 fiddle.ipynb
 MNIST/
+FashionMNIST/
 
 # VSCode
 .vscode/*

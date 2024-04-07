@@ -67,6 +67,7 @@ if coreset_size > 0:
 if not mle_comp:
     # MLE pretraining for VCL
     ddpm = model_setup(hparams, mle=True, n_T=n_T, device=device)
+    ddpm.to(device)
     zero_loader = data.DataLoader(digit_datasets[0], batch_size=batch_size, shuffle=True, num_workers=0)
     optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
     for ep in range(20):
