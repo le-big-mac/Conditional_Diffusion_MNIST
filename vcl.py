@@ -1,3 +1,4 @@
+from copy import deepcopy
 import os
 import pickle
 
@@ -78,14 +79,13 @@ if not mle_comp:
     prior_mu, prior_logvar = stack_params(ddpm)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
     ddpm.cpu()
-    prev_params = ddpm.state_dict()
+    prev_params = deepcopy(ddpm.state_dict())
 else:
     prior_mu, prior_logvar = None, None
 
 if device == "cuda:0":
     torch.cuda.empty_cache()
 
-# No need to reinitialize model each class if we are not using coresets
 ddpm = model_setup(hparams, mle=mle_comp, n_T=n_T, device=device)
 if not mle_comp:
     ddpm.load_state_dict(prev_params)
@@ -125,7 +125,7 @@ for digit in range(n_classes):
     # Train and evaluate on coreset data
     if coreset_size > 0:
         # Save pre-coreset parameters
-        prev_params = {k : v.cpu() for k, v in ddpm.state_dict().items()}
+        prev_params = deepcopy({k : v.cpu() for k, v in ddpm.state_dict().items()})
         for i in range(digit + 1):
             ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
             optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
