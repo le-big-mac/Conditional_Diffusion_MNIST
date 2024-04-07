@@ -91,6 +91,7 @@ if not mle_comp:
     ddpm.load_state_dict(prev_params)
 ddpm.to(device)
 optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+prev_optim_state = deepcopy(optim.state_dict())
 
 for digit in range(n_classes):
     digit_data = digit_datasets[digit]
@@ -100,6 +101,7 @@ for digit in range(n_classes):
     if coreset_size > 0 and digit > 0:
         ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
         optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+        optim.load_state_dict(prev_optim_state)
 
     # Train on non-coreset data
     for ep in range(n_epoch):
@@ -117,7 +119,8 @@ for digit in range(n_classes):
 
     # Save model and prior
     if save_model:
-        torch.save({k : v.cpu() for k, v in ddpm.state_dict().items()}, save_dir + f"/{digit}/model.pth")
+        torch.save(ddpm.state_dict(), save_dir + f"/{digit}/model.pth")
+        torch.save(optim.state_dict(), save_dir + f"/{digit}/optim.pth")
         with open(save_dir + f"/{digit}/prior.pkl", "wb+") as f:
             pickle.dump((prior_mu, prior_logvar), f)
         print('saved model at ' + save_dir + f"/model_{digit}.pth")
@@ -126,6 +129,7 @@ for digit in range(n_classes):
     if coreset_size > 0:
         # Save pre-coreset parameters
         prev_params = deepcopy({k : v.cpu() for k, v in ddpm.state_dict().items()})
+        prev_optim_state = deepcopy(optim.state_dict())
         for i in range(digit + 1):
             ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
             optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
