@@ -53,6 +53,7 @@ hparams = {
 coreset_size = args.coreset_size
 fashion = args.fashion
 
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 os.makedirs(save_dir, exist_ok=True)
 
 for i in range(n_classes):
@@ -133,6 +134,7 @@ for digit in range(n_classes):
         for i in range(digit + 1):
             ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
             optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+            optim.load_state_dict(prev_optim_state)
             coreset_loader = data.DataLoader(coresets[i], batch_size=batch_size, shuffle=True, num_workers=0)
             for ep in range(n_epoch):
                 print(f"Epoch {ep}")
