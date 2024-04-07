@@ -72,7 +72,7 @@ if not mle_comp:
     optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
     for ep in range(20):
         print(f"Epoch {ep}")
-        optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
+        optim.param_groups[0]['lr'] = lrate*(1-ep/20)
         train_epoch(ddpm, zero_loader, optim, device, num_param_samples=1)
     eval(19, ddpm, 1, f"{save_dir}/mle", device, num_eval_samples=1)
     prior_mu, prior_logvar = stack_params(ddpm)
