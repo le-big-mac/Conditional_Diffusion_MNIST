@@ -213,6 +213,7 @@ class ContextUnet(nn.Module):
                     cemb[mask_indices] = det_mean
                     cemb = cemb.repeat(num_param_samples, 1, 1)
                 else:
+                    cemb = cemb.repeat(num_param_samples, 1, 1)
                     for i in range(num_param_samples):
                         cemb[i][mask_indices] = det_mean + torch.randn_like(det_mean) * torch.exp(0.5 * det_logvar)
 
