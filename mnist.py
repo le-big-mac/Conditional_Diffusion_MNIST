@@ -59,7 +59,9 @@ def get_random_coreset(dataset, coreset_size):
     n_data = len(data)
     coreset_indices = torch.randperm(n_data)[:coreset_size]
     coreset = TensorDataset(data[coreset_indices], targets[coreset_indices])
-    train_data = TensorDataset(data[~coreset_indices], targets[~coreset_indices])
+    train_indices = torch.ones(n_data, dtype=bool)
+    train_indices[coreset_indices] = False
+    train_data = TensorDataset(data[train_indices], targets[train_indices])
 
     return train_data, coreset
 
