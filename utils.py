@@ -75,7 +75,6 @@ def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 2.0, 5.0], save_gi
     n_noise_samples = 4 * n_classes
     for w_i, w in enumerate(ws_test):
         x_gen, x_gen_store = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_eval_samples)
-        x_gen, x_gen_store = x_gen.cpu(), x_gen_store.cpu()
         grid = make_grid(x_gen*-1 + 1, nrow=n_classes)
         save_image(grid, save_dir + save_name)
         print('saved image at ' + save_dir + save_name)
