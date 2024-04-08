@@ -20,7 +20,7 @@ import torch
 import torch.nn as nn
 
 import bayesian_layers as bl
-from model import TensorDataset
+from mnist import TensorDataset
 
 class ResidualConvBlock(nn.Module):
     def __init__(
