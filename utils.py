@@ -1,11 +1,13 @@
 # import matplotlib.pyplot as plt
 # from matplotlib.animation import FuncAnimation, PillowWriter
+import math
 import pickle
 import torch
 from torchvision.utils import save_image, make_grid
 from tqdm import tqdm
 
 from model import ContextUnet, DDPM
+from mnist import merge_datasets
 
 def stack_params(model):
     mu = []
@@ -111,6 +113,12 @@ def sample_dataset(ddpm, n_classes, save_dir, device, w, num_datapoints=200, num
     ddpm.eval()
 
     n_noise_samples = n_classes * (num_datapoints // n_classes)
-    sampled_dataset = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_param_samples, return_dataset=True)
+
+    samples = []
+    for i in range(math.ceil(n_noise_samples // 200)):
+        sampled_dataset = ddpm.sample(200, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_param_samples, return_dataset=True)
+        samples.append(sampled_dataset)
+
+    sampled_dataset = merge_datasets(samples)
     with open(f"{save_dir}/{n_classes-1}.pkl", "wb+") as f:
         pickle.dump(sampled_dataset, f)
