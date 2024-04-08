@@ -48,6 +48,7 @@ coreset_size = args.coreset_size
 fashion = args.fashion
 sample_dset = args.sample_dataset
 
+digit_datasets = get_split_MNIST(fashion=fashion)
 if coreset_size > 0:
     with open(f"{save_dir}/data_and_coresets.pkl", "rb") as f:
         digit_datasets, coresets = pickle.load(f)
@@ -73,15 +74,16 @@ for digit in range(n_classes):
 
     merged = merge_datasets(coresets[:(digit+1)])
     ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
-    optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
-    optim.load_state_dict(prev_optim_state)
-    coreset_loader = data.DataLoader(merged, batch_size=batch_size, shuffle=True, num_workers=0)
-    for ep in range(n_epoch):
-        print(f"Epoch {ep}")
-        optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
-        train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=True, num_param_samples=1, gamma=gamma)
+    if coreset_size > 0:
+        optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
+        optim.load_state_dict(prev_optim_state)
+        coreset_loader = data.DataLoader(merged, batch_size=batch_size, shuffle=True, num_workers=0)
+        for ep in range(n_epoch):
+            print(f"Epoch {ep}")
+            optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
+            train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=True, num_param_samples=1, gamma=gamma)
     if sample_dset:
-        sample_dataset(ddpm, digit+1, save_dir, device, 2.0, num_samples=num_eval_samples)
+        sample_dataset(ddpm, digit+1, save_dir, device, 2.0, num_param_samples=num_eval_samples)
     else:
         eval(ep, ddpm, digit+1, f"{save_dir}/{digit}", device, save_gif=False, num_eval_samples=num_eval_samples, save_name="coreset_mle_all", ws_test=[2.0])
 
