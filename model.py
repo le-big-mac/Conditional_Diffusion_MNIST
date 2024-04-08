@@ -362,6 +362,7 @@ class DDPM(nn.Module):
             #     x_i_store.append(x_i.detach().cpu())
 
         if return_dataset:
+            x_i = x_i.cpu().detach()
             sampled_dataset = TensorDataset(x_i, c_i[:num_noise_samples])
             return sampled_dataset
 
