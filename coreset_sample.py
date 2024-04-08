@@ -85,7 +85,7 @@ for digit in range(n_classes):
             optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
             train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=True, num_param_samples=1, gamma=gamma)
     if sample_dset:
-        sample_dataset(ddpm, digit+1, f"{save_dir}/{sample_dataset}", device, 2.0, num_param_samples=num_eval_samples, num_samples=1000)
+        sample_dataset(ddpm, digit+1, f"{save_dir}/sampled_datasets", device, 2.0, num_param_samples=num_eval_samples, num_datapoints=1000)
     else:
         eval(ep, ddpm, digit+1, f"{save_dir}/{digit}", device, save_gif=False, num_eval_samples=num_eval_samples, save_name="coreset_mle_all", ws_test=[2.0])
 
