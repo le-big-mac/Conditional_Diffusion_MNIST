@@ -46,7 +46,7 @@ num_param_samples = 1 if mle_comp else 10
 
 coreset_size = args.coreset_size
 fashion = args.fashion
-sample_dataset = args.sample_dataset
+sample_dset = args.sample_dataset
 
 if coreset_size > 0:
     with open(f"{save_dir}/data_and_coresets.pkl", "rb") as f:
@@ -80,7 +80,7 @@ for digit in range(n_classes):
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/n_epoch)
         train_epoch(ddpm, coreset_loader, optim, device, prior_mu=prior_mu, prior_logvar=prior_logvar, mle=True, num_param_samples=1, gamma=gamma)
-    if sample_dataset:
+    if sample_dset:
         sample_dataset(ddpm, digit+1, save_dir, device, 2.0, num_samples=num_eval_samples)
     else:
         eval(ep, ddpm, digit+1, f"{save_dir}/{digit}", device, save_gif=False, num_eval_samples=num_eval_samples, save_name="coreset_mle_all", ws_test=[2.0])
