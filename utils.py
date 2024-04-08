@@ -1,5 +1,6 @@
 # import matplotlib.pyplot as plt
 # from matplotlib.animation import FuncAnimation, PillowWriter
+import pickle
 import torch
 from torchvision.utils import save_image, make_grid
 from tqdm import tqdm
@@ -82,7 +83,7 @@ def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 2.0, 5.0], save_gi
 
     n_noise_samples = 4 * n_classes
     for w_i, w in enumerate(ws_test):
-        x_gen, x_gen_store = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_eval_samples)
+        x_gen = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_eval_samples)
         grid = make_grid(x_gen*-1 + 1, nrow=n_classes)
         save_image(grid, f"{save_dir}/{save_name}_w{w}.png")
         print(f"saved image at {save_dir}/{save_name}_w{w}.png")
@@ -103,3 +104,13 @@ def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 2.0, 5.0], save_gi
         #     ani = FuncAnimation(fig, animate_diff, fargs=[x_gen_store],  interval=200, blit=False, repeat=True, frames=x_gen_store.shape[0])
         #     ani.save(save_dir + f"gif_ep{ep}_w{w}.gif", dpi=100, writer=PillowWriter(fps=5))
         #     print('saved image at ' + save_dir + f"gif_ep{ep}_w{w}.gif")
+
+
+@torch.no_grad()
+def sample_dataset(ddpm, n_classes, save_dir, device, w, num_datapoints=200, num_param_samples=10):
+    ddpm.eval()
+
+    n_noise_samples = n_classes * (num_datapoints // n_classes)
+    sampled_dataset = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_param_samples, return_dataset=True)
+    with open(f"{save_dir}/sampled_dataset.pkl", "wb+") as f:
+        pickle.dump(sampled_dataset, f)

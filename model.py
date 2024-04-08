@@ -18,9 +18,9 @@ import math
 
 import torch
 import torch.nn as nn
-import numpy as np
 
 import bayesian_layers as bl
+from model import TensorDataset
 
 class ResidualConvBlock(nn.Module):
     def __init__(
@@ -314,7 +314,7 @@ class DDPM(nn.Module):
         noise = noise.repeat(num_param_samples, 1, 1, 1)
         return self.loss_mse(noise, out)
 
-    def sample(self, num_noise_samples, num_classes, size, device, guide_w = 0.0, num_param_samples=10):
+    def sample(self, num_noise_samples, num_classes, size, device, guide_w = 0.0, num_param_samples=10, return_dataset=False):
         # we follow the guidance sampling scheme described in 'Classifier-Free Diffusion Guidance'
         # to make the fwd passes efficient, we concat two versions of the dataset,
         # one with context_mask=0 and the other context_mask=1
@@ -333,7 +333,7 @@ class DDPM(nn.Module):
         context_mask = context_mask.repeat(2)
         context_mask[num_noise_samples:] = 1. # makes second half of batch context free
 
-        x_i_store = [] # keep track of generated steps in case want to plot something
+        # x_i_store = [] # keep track of generated steps in case want to plot something
         print()
         for i in range(self.n_T, 0, -1):
             print(f'sampling timestep {i}',end='\r')
@@ -358,8 +358,11 @@ class DDPM(nn.Module):
                 self.oneover_sqrta[i] * (x_i - eps * self.mab_over_sqrtmab[i])
                 + self.sqrt_beta_t[i] * z
             )
-            if i%20==0 or i==self.n_T or i<8:
-                x_i_store.append(x_i.detach().cpu().numpy())
+            # if i%20==0 or i==self.n_T or i<8:
+            #     x_i_store.append(x_i.detach().cpu())
 
-        x_i_store = np.array(x_i_store)
-        return x_i, x_i_store
+        if return_dataset:
+            sampled_dataset = TensorDataset(torch.stack(x_i), c_i[:num_noise_samples])
+            return sampled_dataset
+
+        return x_i
