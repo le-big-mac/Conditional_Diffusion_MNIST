@@ -68,13 +68,13 @@ optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
 for digit in range(n_classes):
     # Reinitialize with previous parameters if we are using coresets
     prev_params = torch.load(f"{save_dir}/{digit}/model.pth")
-    prev_optim_state = torch.load(f"{save_dir}/{digit}/optim.pth")
     with open(f"{save_dir}/{digit}/prior.pkl", "rb") as f:
       prior_mu, prior_logvar = pickle.load(f)
 
-    merged = merge_datasets(coresets[:(digit+1)])
     ddpm.load_state_dict({k : v.to(device) for k, v in prev_params.items()})
     if coreset_size > 0:
+        prev_optim_state = torch.load(f"{save_dir}/{digit}/optim.pth")
+        merged = merge_datasets(coresets[:(digit+1)])
         optim = torch.optim.Adam(ddpm.parameters(), lr=lrate)
         optim.load_state_dict(prev_optim_state)
         coreset_loader = data.DataLoader(merged, batch_size=batch_size, shuffle=True, num_workers=0)
