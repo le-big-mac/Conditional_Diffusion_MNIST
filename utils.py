@@ -112,11 +112,10 @@ def eval(ep, ddpm, n_classes, save_dir, device, ws_test=[0.5, 2.0, 5.0], save_gi
 def sample_dataset(ddpm, n_classes, save_dir, device, w, num_datapoints=200, num_param_samples=10):
     ddpm.eval()
 
-    n_noise_samples = n_classes * (num_datapoints // n_classes)
-
     samples = []
-    for i in range(math.ceil(n_noise_samples // 200)):
-        sampled_dataset = ddpm.sample(200, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_param_samples, return_dataset=True)
+    for i in range(math.ceil(num_datapoints // 200)):
+        num_samples = n_classes * (200 // n_classes)
+        sampled_dataset = ddpm.sample(num_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_param_samples, return_dataset=True)
         samples.append(sampled_dataset)
 
     sampled_dataset = merge_datasets(samples)
