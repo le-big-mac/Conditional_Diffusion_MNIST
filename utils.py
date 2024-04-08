@@ -112,5 +112,5 @@ def sample_dataset(ddpm, n_classes, save_dir, device, w, num_datapoints=200, num
 
     n_noise_samples = n_classes * (num_datapoints // n_classes)
     sampled_dataset = ddpm.sample(n_noise_samples, n_classes, (1, 28, 28), device, guide_w=w, num_param_samples=num_param_samples, return_dataset=True)
-    with open(f"{save_dir}/sampled_dataset.pkl", "wb+") as f:
+    with open(f"{save_dir}/{n_classes-1}.pkl", "wb+") as f:
         pickle.dump(sampled_dataset, f)
