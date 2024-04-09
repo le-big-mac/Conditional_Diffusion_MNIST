@@ -28,8 +28,6 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 import numpy as np
 
-import bayesian_layers as bl
-
 class ResidualConvBlock(nn.Module):
     def __init__(
         self, in_channels: int, out_channels: int, is_res: bool = False
@@ -41,13 +39,13 @@ class ResidualConvBlock(nn.Module):
         self.same_channels = in_channels==out_channels
         self.is_res = is_res
         self.conv1 = nn.Sequential(
-            bl.Conv2d(in_channels, out_channels, 3, 1, 1, mle=True),
-            nn.BatchNorm2d(out_channels, track_running_stats=False),
+            nn.Conv2d(in_channels, out_channels, 3, 1, 1),
+            nn.BatchNorm2d(out_channels),
             nn.GELU(),
         )
         self.conv2 = nn.Sequential(
-            bl.Conv2d(out_channels, out_channels, 3, 1, 1, mle=True),
-            nn.BatchNorm2d(out_channels, track_running_stats=False),
+            nn.Conv2d(out_channels, out_channels, 3, 1, 1),
+            nn.BatchNorm2d(out_channels),
             nn.GELU(),
         )
 
@@ -87,7 +85,7 @@ class UnetUp(nn.Module):
         process and upscale the image feature maps
         '''
         layers = [
-            bl.ConvTranspose2d(in_channels, out_channels, 2, 2, mle=True),
+            nn.ConvTranspose2d(in_channels, out_channels, 2, 2),
             ResidualConvBlock(out_channels, out_channels),
             ResidualConvBlock(out_channels, out_channels),
         ]
@@ -107,9 +105,9 @@ class EmbedFC(nn.Module):
         '''
         self.input_dim = input_dim
         layers = [
-            bl.Linear(input_dim, emb_dim, mle=True),
+            nn.Linear(input_dim, emb_dim),
             nn.GELU(),
-            bl.Linear(emb_dim, emb_dim, mle=True),
+            nn.Linear(emb_dim, emb_dim),
         ]
         self.model = nn.Sequential(*layers)
 
@@ -140,7 +138,7 @@ class ContextUnet(nn.Module):
 
         self.up0 = nn.Sequential(
             # nn.ConvTranspose2d(6 * n_feat, 2 * n_feat, 7, 7), # when concat temb and cemb end up w 6*n_feat
-            bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=True), # otherwise just have 2*n_feat
+            nn.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7), # otherwise just have 2*n_feat
             nn.GroupNorm(8, 2 * n_feat),
             nn.ReLU(),
         )
@@ -148,10 +146,10 @@ class ContextUnet(nn.Module):
         self.up1 = UnetUp(4 * n_feat, n_feat)
         self.up2 = UnetUp(2 * n_feat, n_feat)
         self.out = nn.Sequential(
-            bl.Conv2d(2 * n_feat, n_feat, 3, 1, 1, mle=True),
+            nn.Conv2d(2 * n_feat, n_feat, 3, 1, 1),
             nn.GroupNorm(8, n_feat),
             nn.ReLU(),
-            bl.Conv2d(n_feat, self.in_channels, 3, 1, 1, mle=True),
+            nn.Conv2d(n_feat, self.in_channels, 3, 1, 1),
         )
 
     def forward(self, x, c, t, context_mask):

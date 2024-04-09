@@ -15,14 +15,24 @@ class TensorDataset(data.Dataset):
         return len(self.data)
 
 
-def get_MNIST():
+def get_MNIST(test=False):
     train_dataset = MNIST(
         root="data",
         train=True,
         download=True,
     )
 
+    test_dataset = MNIST(
+        root="data",
+        train=False,
+        download=True,
+    )
+
     train_dataset = TensorDataset(train_dataset.data.unsqueeze(1) / 255, train_dataset.targets)
+    test_dataset = TensorDataset(test_dataset.data.unsqueeze(1) / 255, test_dataset.targets)
+
+    if test:
+        return train_dataset, test_dataset
 
     return train_dataset
 
