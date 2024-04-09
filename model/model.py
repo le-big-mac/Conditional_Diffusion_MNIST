@@ -19,8 +19,8 @@ import math
 import torch
 import torch.nn as nn
 
-import bayesian_layers as bl
-from mnist import TensorDataset
+import model.bayesian_layers as bl
+from data.mnist import TensorDataset
 
 class ResidualConvBlock(nn.Module):
     def __init__(
@@ -110,31 +110,14 @@ class EmbedFC(nn.Module):
         return self.l2(x, num_param_samples)
 
 
-class EmbedFC_deterministic(nn.Module):
-    def __init__(self, input_dim, emb_dim):
-        super(EmbedFC_deterministic, self).__init__()
-        '''
-        generic one layer FC NN for embedding things
-        '''
-        self.input_dim = input_dim
-        self.l1 = nn.Linear(input_dim, emb_dim)
-        self.l2 = nn.Linear(emb_dim, emb_dim)
-
-    def forward(self, x, num_param_samples=10):
-        x = x.view(-1, self.input_dim)
-        x = nn.functional.gelu(self.l1(x))
-        return self.l2(x)
-
-
 class ContextUnet(nn.Module):
-    def __init__(self, in_channels, n_feat = 256, n_classes=10, mle=False, deterministic_embed=False, logvar_init=-8.0):
+    def __init__(self, in_channels, n_feat = 256, n_classes=10, mle=False, logvar_init=-8.0):
         super(ContextUnet, self).__init__()
 
         self.in_channels = in_channels
         self.n_feat = n_feat
         self.n_classes = n_classes
         self.mle = mle
-        self.deterministic_embed = deterministic_embed
 
         self.init_conv = ResidualConvBlock(in_channels, n_feat, is_res=True, mle=mle, logvar_init=logvar_init)
 
@@ -146,25 +129,20 @@ class ContextUnet(nn.Module):
         self.timeembed1 = EmbedFC(1, 2*n_feat, mle=mle, logvar_init=logvar_init)
         self.timeembed2 = EmbedFC(1, 1*n_feat, mle=mle, logvar_init=logvar_init)
 
-        if self.deterministic_embed:
-            self.contextembed1 = nn.ModuleList([EmbedFC_deterministic(1, 2*n_feat) for _ in range(n_classes)])
-            self.contextembed2 = nn.ModuleList([EmbedFC_deterministic(1, 1*n_feat) for _ in range(n_classes)])
-            self.c1_det_mean = nn.Parameter(torch.Tensor(1, 2*n_feat))
-            self.c2_det_mean = nn.Parameter(torch.Tensor(1, 1*n_feat))
-            self.c1_det_logvar = nn.Parameter(torch.Tensor(1, 2*n_feat))
-            self.c2_det_logvar = nn.Parameter(torch.Tensor(1, 1*n_feat))
-            nn.init.kaiming_uniform_(self.c1_det_mean, a=math.sqrt(5))
-            nn.init.constant_(self.c1_det_logvar, logvar_init)
-            nn.init.kaiming_uniform_(self.c2_det_mean, a=math.sqrt(5))
-            nn.init.constant_(self.c2_det_logvar, logvar_init)
-        else:
-            self.contextembed1 = EmbedFC(n_classes, 2*n_feat, mle=mle, logvar_init=logvar_init)
-            self.contextembed2 = EmbedFC(n_classes, 1*n_feat, mle=mle, logvar_init=logvar_init)
-
-        # self.timeembed1 = EmbedFC_deterministic(1, 2*n_feat)
-        # self.timeembed2 = EmbedFC_deterministic(1, 1*n_feat)
-        # self.contextembed1 = EmbedFC_deterministic(n_classes, 2*n_feat)
-        # self.contextembed2 = EmbedFC_deterministic(n_classes, 1*n_feat)
+        self.contextembed1 = nn.ParameterList([nn.Parameter(torch.Tensor(1, 2*n_feat)) for _ in range(n_classes)])
+        self.contextembed2 = nn.ParameterList([nn.Parameter(torch.Tensor(1, 1*n_feat)) for _ in range(n_classes)])
+        self.c1_det_mean = nn.Parameter(torch.Tensor(1, 2*n_feat))
+        self.c2_det_mean = nn.Parameter(torch.Tensor(1, 1*n_feat))
+        self.c1_det_logvar = nn.Parameter(torch.Tensor(1, 2*n_feat))
+        self.c2_det_logvar = nn.Parameter(torch.Tensor(1, 1*n_feat))
+        for t in self.contextembed1:
+            nn.init.kaiming_uniform_(t, a=math.sqrt(5))
+        for t in self.contextembed2:
+            nn.init.kaiming_uniform_(t, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.c1_det_mean, a=math.sqrt(5))
+        nn.init.constant_(self.c1_det_logvar, logvar_init)
+        nn.init.kaiming_uniform_(self.c2_det_mean, a=math.sqrt(5))
+        nn.init.constant_(self.c2_det_logvar, logvar_init)
 
         self.up0_ct = bl.ConvTranspose2d(2 * n_feat, 2 * n_feat, 7, 7, mle=mle, logvar_init=logvar_init)
         self.up0 = nn.Sequential(
@@ -194,41 +172,24 @@ class ContextUnet(nn.Module):
         down2 = self.down2(down1, num_param_samples)
         hiddenvec = self.to_vec(down2)
 
-        if self.deterministic_embed:
-            one_input = torch.ones((1,1)).type(torch.float).to(c.device)
-            c = c + (context_mask) * 10
-            class_indices = [torch.where(c==i)[0] for i in range(self.n_classes)]
-            mask_indices = torch.where(context_mask==1)[0]
-
-            def context_embed(embed_fns, det_mean, det_logvar, out_shape):
-                cemb = torch.empty((c.shape[0], out_shape), dtype=torch.float).to(c.device)
-                for i in range(self.n_classes):
-                    cemb[class_indices[i]] = embed_fns[i](one_input)
+        c = c + (context_mask) * 10
+        class_indices = [torch.where(c==i)[0] for i in range(self.n_classes)]
+        mask_indices = torch.where(context_mask==1)[0]
+        def context_embed(embed_vecs, det_mean, det_logvar, out_shape):
+            cemb = torch.empty((c.shape[0], out_shape), dtype=torch.float).to(c.device)
+            for i in range(self.n_classes):
+                cemb[class_indices[i]] = embed_vecs[i]
+            if self.mle:
+                cemb[mask_indices] = det_mean
+                cemb = cemb.repeat(num_param_samples, 1, 1)
+            else:
                 cemb = cemb.repeat(num_param_samples, 1, 1)
                 for i in range(num_param_samples):
-                    if self.mle:
-                        cemb[i][mask_indices] = det_mean
-                    else:
-                        cemb[i][mask_indices] = det_mean + torch.randn_like(det_mean) * torch.exp(0.5 * det_logvar)
+                    cemb[i][mask_indices] = det_mean + torch.randn_like(det_mean) * torch.exp(0.5 * det_logvar)
+            return cemb.reshape(-1, out_shape, 1, 1)
 
-                return cemb.reshape(-1, out_shape, 1, 1)
-
-            cemb1 = context_embed(self.contextembed1, self.c1_det_mean, self.c1_det_logvar, 2*self.n_feat)
-            cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c2_det_logvar, self.n_feat)
-
-        else:
-            c = c.repeat(num_param_samples)
-            # mask out context if context_mask == 1
-            context_mask = context_mask.repeat(num_param_samples)
-            context_mask = context_mask[:, None]
-            # convert context to one hot embedding
-            c = nn.functional.one_hot(c, num_classes=self.n_classes).type(torch.float)
-            context_mask = context_mask.repeat(1,self.n_classes)
-            context_mask = (-1*(1-context_mask)) # need to flip 0 <-> 1
-            c = c * context_mask
-
-            cemb1 = self.contextembed1(c, num_param_samples).view(-1, self.n_feat * 2, 1, 1)
-            cemb2 = self.contextembed2(c, num_param_samples).view(-1, self.n_feat, 1, 1)
+        cemb1 = context_embed(self.contextembed1, self.c1_det_mean, self.c1_det_logvar, 2*self.n_feat)
+        cemb2 = context_embed(self.contextembed2, self.c2_det_mean, self.c2_det_logvar, self.n_feat)
 
         # embed context, time step
         temb1 = self.timeembed1(t, num_param_samples).view(-1, self.n_feat * 2, 1, 1)
@@ -358,8 +319,6 @@ class DDPM(nn.Module):
                 self.oneover_sqrta[i] * (x_i - eps * self.mab_over_sqrtmab[i])
                 + self.sqrt_beta_t[i] * z
             )
-            # if i%20==0 or i==self.n_T or i<8:
-            #     x_i_store.append(x_i.detach().cpu())
 
         if return_dataset:
             x_i = x_i.detach().cpu()
