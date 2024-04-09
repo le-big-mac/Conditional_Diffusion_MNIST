@@ -1,4 +1,4 @@
-# Variational continuaal learning for diffusion model.
+# Variational continual learning for diffusion model.
 
 A codespace for training diffusion models with [variational continual learning](https://arxiv.org/abs/1710.10628), to see if it can mitigate catastrophic forgetting.
 
