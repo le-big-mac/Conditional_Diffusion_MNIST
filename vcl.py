@@ -5,7 +5,7 @@ import pickle
 import torch
 from torch.utils import data
 
-from mnist import get_split_MNIST, get_random_coreset
+from data.mnist import get_split_MNIST, get_random_coreset
 from utils import eval, model_setup, stack_params, train_epoch
 import argparse
 

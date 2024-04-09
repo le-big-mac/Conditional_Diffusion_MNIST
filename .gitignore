@@ -2,6 +2,8 @@
 fiddle.ipynb
 MNIST/
 FashionMNIST/
+generated_data/
+plots/
 
 # VSCode
 .vscode/*
