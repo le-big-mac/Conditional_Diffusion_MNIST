@@ -26,3 +26,5 @@ A codespace for training diffusion models with [variational continual learning](
 </div>
 
 Note that the variational inference for VCL is very expensive, and so this code will take several hours to run on a powerful GPU.
+
+This diffusion model in this project is based on original work by Tim Pearce, released under the MIT License in 2022. The original code can be found at [Conditional Diffusion MNIST](https://github.com/TeaPearce/Conditional_Diffusion_MNIST). The modifications made by me in 2024 are also released under the MIT License.
