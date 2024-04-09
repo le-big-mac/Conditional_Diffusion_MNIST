@@ -6,12 +6,12 @@ A codespace for training diffusion models with [variational continual learning](
   <table>
     <tr>
       <td align="center">
-        <img src="standard.png" width="200" />
+        <img src="images/standard.png" width="200" />
         <br>
         <em>Standard training.</em>
       </td>
       <td align="center">
-        <img src="vcl.png" width="200" />
+        <img src="images/vcl.png" width="200" />
         <br>
         <em>VCL training.</em>
       </td>
