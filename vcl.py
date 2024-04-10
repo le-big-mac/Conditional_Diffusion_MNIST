@@ -69,7 +69,7 @@ if not mle:
         print(f"Epoch {ep}")
         optim.param_groups[0]['lr'] = lrate*(1-ep/20)
         train_epoch(ddpm, zero_loader, optim, device, num_param_samples=1)
-    eval(19, ddpm, 1, f"{save_dir}/mle", device, num_eval_samples=1)
+    eval(ddpm, 1, f"{save_dir}/mle/training_end", device, num_param_samples=1)
     prior_mu, prior_logvar = stack_params(ddpm)
     prior_mu, prior_logvar = prior_mu.detach().clone(), prior_logvar.detach().clone()
     ddpm.cpu()
