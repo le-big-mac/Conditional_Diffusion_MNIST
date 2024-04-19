@@ -22,30 +22,39 @@ def get_MNIST(test=False):
         download=True,
     )
 
-    test_dataset = MNIST(
-        root="data",
-        train=False,
-        download=True,
-    )
-
     train_dataset = TensorDataset(train_dataset.data.unsqueeze(1) / 255, train_dataset.targets)
-    test_dataset = TensorDataset(test_dataset.data.unsqueeze(1) / 255, test_dataset.targets)
 
     if test:
+        test_dataset = MNIST(
+            root="data",
+            train=False,
+            download=True,
+        )
+
+        test_dataset = TensorDataset(test_dataset.data.unsqueeze(1) / 255, test_dataset.targets)
         return train_dataset, test_dataset
 
     return train_dataset
 
 
-def get_FashionMNIST():
+def get_FashionMNIST(test=False):
     train_dataset = FashionMNIST(
         root="data",
         train=True,
         download=True,
-        transform=lambda x: x
     )
 
     train_dataset = TensorDataset(train_dataset.data.unsqueeze(1) / 255, train_dataset.targets)
+
+    if test:
+        test_dataset = FashionMNIST(
+            root="data",
+            train=False,
+            download=True,
+        )
+
+        test_dataset = TensorDataset(test_dataset.data.unsqueeze(1) / 255, test_dataset.targets)
+        return train_dataset, test_dataset
 
     return train_dataset
 
