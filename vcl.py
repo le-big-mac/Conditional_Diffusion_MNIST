@@ -49,8 +49,8 @@ os.makedirs(save_dir, exist_ok=True)
 
 for i in range(n_classes):
     os.makedirs(f"{save_dir}/{i}", exist_ok=True)
-os.makedirs(f"{save_dir}/mle/", exist_ok=True)
-os.makedev(f"{save_dir}/sampled_datasets", exist_ok=True)
+os.makedirs(f"{save_dir}/mle", exist_ok=True)
+os.makedirs(f"{save_dir}/sampled_datasets", exist_ok=True)
 
 
 digit_datasets = get_split_MNIST(fashion=fashion)
